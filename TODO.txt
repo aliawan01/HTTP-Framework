@@ -1,21 +1,13 @@
 TODO:
 
-- Use stb_load to load images into htmlCode
-  Try to see if strcat works then.
-  If it doesn't then we will need to add the httpResponseHeader and the image data in htmlCode into a file using
-  the write function and then read from that file and send that data to the browser.
-
-======================================================== 
-- OTHER IDEA!!!!!!!!!!!
-- Try to use memcpy instead of strcat since it will not stop at the null terminator.
-  (will need to play around so that it starts appending at the end of the file, or could
-   add image data into the response string first and then add the header information at 
-   the start of the string).
-======================================================== 
-
 
 - Parse http request to see what they want
-- FAVICONS!!!
-- Be able to send images
 - Be able to setup routes
 - PUT requests
+- Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
+  data will be sent).
+- Make server logs easier to read and add colour
+
+DONE: 
+- Favicons
+- Sending Images

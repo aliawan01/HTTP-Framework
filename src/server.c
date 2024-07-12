@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -16,7 +17,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
-#include <stdio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -183,53 +183,47 @@ int main() {
 			char* htmlCode;
 			unsigned char* httpResponseHeader;
 			bool showingImage = false;
+			int htmlCodeLength;
+
 			if (!strcmp(requestedRoute, "/favicon.ico")) {
 				printf("----------------------\n");
 				printf("Asked for a favicon!!!\n");
 				printf("----------------------\n");
-				htmlCode = stb_image("static/favicon.ico");
+
+				htmlCode = getFileContents("static/favicon.ico");
+				htmlCodeLength = getFileSize("static/favicon.ico");
 				httpResponseHeader = "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\n\r\n";
 				showingImage = true;
 			}
-			if (!strcmp(requestedRoute, "/ginger.jpg")) {
+			else if (!strcmp(requestedRoute, "/ginger.jpg")) {
 				printf("----------------------\n");
 				printf("Asked for ginger.jpg!!!!!\n");
 				printf("----------------------\n");
+
 				htmlCode = getFileContents("static/ginger.jpg");
+				htmlCodeLength = getFileSize("static/ginger.jpg");
 				httpResponseHeader = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n\r\n";
 				showingImage = true;
 			}
 			else {
 				htmlCode = getFileContents("static/firstPage.html");
+				htmlCodeLength = strlen(htmlCode);
 				httpResponseHeader = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
 			}
 
-			free(requestedRoute);
-
-
-
-			char* returnData = malloc(strlen(htmlCode)+strlen(httpResponseHeader));
-
-			memset(returnData, 0, strlen(htmlCode)+strlen(httpResponseHeader));
-			strcpy(returnData, httpResponseHeader);
-			strcat(returnData, htmlCode);
-
 			printf("Html Code: %s\n", htmlCode);
 
+			int httpResponseHeaderLength = (int)strlen(httpResponseHeader);
 
-			initSendResult = send(clientSocket, returnData, (int)strlen(returnData) + 1, 0);
-			if (initSendResult == SOCKET_ERROR) {
-				printf("[SERVER] send() failed: %d\n", WSAGetLastError());
-				closesocket(clientSocket);
-				WSACleanup();
-				return 1;
-			}
+			send(clientSocket, httpResponseHeader, httpResponseHeaderLength, 0);
+			send(clientSocket, htmlCode, htmlCodeLength, 0);
 
 			printf("[SERVER] Bytes sent: %d\n", initSendResult);
-			printf("[SERVER] Data sent: %s\n", returnData);
+			printf("[SERVER] Data sent (HEADER): %s\n", httpResponseHeader);
+			printf("[SERVER] Data sent (DATA): %s\n", htmlCode);
 
 			free(htmlCode);
-			free(returnData);
+			free(requestedRoute);
 		}
 		else if (initResult == 0) {
 			printf("[SERVER] Connection gracefully closing...\n");
@@ -257,9 +251,5 @@ int main() {
 	WSACleanup();
 	*/
 
-
 	return 0;
-
-
-
 }
