@@ -1,13 +1,12 @@
 TODO:
 
+* PUT requests
+  * store data.
+  * parse PUT request for escape characters.
 
-- Parse http request to see what they want
-- Be able to setup routes
-- PUT requests
 - Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
-  data will be sent).
+  data will be sent) -> this will need multithreading to handle multiple clients.
 - Make server logs easier to read and add colour
-
-DONE: 
-- Favicons
-- Sending Images
+- Abstract sockets methods so that we can support Windows and Linux.
+- Add SSL/TLS encryption.
+- Logging data to the database.
