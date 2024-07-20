@@ -1,11 +1,5 @@
 #include "server.h"
 
-global HTTPRouteInfo* route_info_array;
-global int route_info_array_index;
-// This is the number of elements which have been added above
-// INITIAL_ROUTE_INFO_ARRAY_SIZE
-global int num_of_added_elements;
-
 static void HTTP_Initialize(void) {
 	route_info_array = malloc(sizeof(HTTPRouteInfo)*INITIAL_ROUTE_INFO_ARRAY_SIZE);
 	memset(route_info_array, 0, sizeof(HTTPRouteInfo)*INITIAL_ROUTE_INFO_ARRAY_SIZE);
@@ -47,6 +41,37 @@ static bool HTTP_HandleRoute(char* method, char* route, char* path_to_data) {
 	};
 	printf("Added Route: %s, Path to File: %s\n", route_info_array[route_info_array_index].route, route_info_array[route_info_array_index].path_to_file);
 	return true;
+}
+
+static void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
+	if (dirs != NULL) {
+		search_dirs = malloc(sizeof(char*)*dirs_size);
+		search_dirs_size = dirs_size;
+		for (int index = 0; index < search_dirs_size; index++) {
+			search_dirs[index] = malloc(strlen(dirs[index]));
+			strcpy(search_dirs[index], dirs[index]);
+		}
+	}
+
+	// char* check_files[] = {"favicon.ico", "ginger.jpg", "checker.img"};
+	// for (int index = 0; index < search_dirs_size; index++) {
+	// 	char temp_buffer[256] = {0};
+	// 	if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
+	// 		search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
+
+	// 		sprintf(temp_buffer, "%s/%s", search_dirs[index], check_files[0]);
+	// 	}
+	// 	else {
+	// 		sprintf(temp_buffer, "%s%s", search_dirs[index], check_files[0]);
+	// 	}
+	// 	int file_size = HTTP_FindFileSize(temp_buffer);
+	// 	if (file_size != -1) {
+	// 		printf("%s is a valid file path!\n", temp_buffer);
+	// 	}
+	// 	else {
+	// 		printf("%s is a NOT a file path!\n", temp_buffer);
+	// 	}
+	// }
 }
 
 static bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) {
@@ -91,16 +116,34 @@ static bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* red
 	return true;
 }
 
-static char* HTTP_GenHeaderFromFile(char* path_to_file) {
-	// Extracting file type into a separate string.
+static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type) {
 	int index = 0;
-	for (;path_to_file[index] != '.'; index++);
-	char file_type[24] = {0};
+	
+	// TODO: Can probably optimise this.
+	while (true) {
+		if (path_to_file[index] == '.') {
+			break;
+		}
+
+		if (index < strlen(path_to_file)) {
+			index++;
+		}
+		else {
+			return false;
+		}
+	}
 	
 	index++;
 	for (int file_type_index = 0; index != strlen(path_to_file); index++, file_type_index++) {
 		file_type[file_type_index] = path_to_file[index];
 	}
+	return true;
+}
+
+static char* HTTP_GenHeaderFromFile(char* path_to_file) {
+	// Extracting file type into a separate string.
+	char file_type[24] = {0};
+	HTTP_ExtractFileTypeFromFilePath(path_to_file, file_type);
 
 	// Generating Header based on file type.
 	char* content_type = NULL;
@@ -239,8 +282,7 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 				parsed_request_route[route_index] = receiving_buffer[index];
 			}
 
-			printf("Parsed Method: %s\n", parsed_request_method);
-			printf("Requested Route: %s\n", parsed_request_route);
+			char* decoded_route = HTTP_DecodeURL(parsed_request_route);
 
 			// Responding to the request with the data in route_info_array if
 			// an entry for the route exists.
@@ -250,15 +292,37 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			char* path_to_file_at_route = {0};
 
 			for (int index = 0; index < route_info_array_index+1; index++) {
-				if (!strcmp(route_info_array[index].route, parsed_request_route)) {
+				if (!strcmp(route_info_array[index].route, decoded_route)) {
 					path_to_file_at_route = route_info_array[index].path_to_file;
+				}
+			}
+
+			// Checking if the route can be mapped to a path to an existing file.
+			char file_type[10] = {0};
+			char temp_buffer[256] = {0};
+			if (HTTP_ExtractFileTypeFromFilePath(decoded_route, file_type)) {
+				for (int index = 0; index < search_dirs_size; index++) {
+					if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
+						search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
+
+						sprintf(temp_buffer, "%s/%s", search_dirs[index], decoded_route+1);
+					}
+					else {
+						sprintf(temp_buffer, "%s%s", search_dirs[index], decoded_route+1);
+					}
+					int file_size = HTTP_FindFileSize(temp_buffer);
+					if (file_size != -1) {
+						path_to_file_at_route = temp_buffer;
+						break;
+					}
 				}
 			}
 
 			// Route doesn't exist.
 			if (path_to_file_at_route == NULL) {
-				HTTP_Send404Page(client_socket, parsed_request_route);
+				HTTP_Send404Page(client_socket, decoded_route);
 				closesocket(client_socket);
+				free(decoded_route);
 				continue;
 			}
 
@@ -267,17 +331,19 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			// File was deleted or it's name was changed during runtime.
 			if (data_to_send_length == -1) {
-				HTTP_Send404Page(client_socket, parsed_request_route);
+				HTTP_Send404Page(client_socket, decoded_route);
 				closesocket(client_socket);
+				free(decoded_route);
 				continue;
 			}
 
 			// Not a recognised file type.
 			http_response_header = HTTP_GenHeaderFromFile(path_to_file_at_route);
 			if (http_response_header == NULL) {
-				HTTP_Send404Page(client_socket, parsed_request_route);
+				HTTP_Send404Page(client_socket, decoded_route);
 				closesocket(client_socket);
 				printf("[ERROR] Couldn't generate header for %s\n", path_to_file_at_route);
+				free(decoded_route);
 				continue;
 			}
 
@@ -292,6 +358,8 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			free(data_to_send);
 			free(http_response_header);
+			free(decoded_route);
+
 		}
 		else if (init_result == 0) {
 			printf("[SERVER] Connection gracefully closing...\n");

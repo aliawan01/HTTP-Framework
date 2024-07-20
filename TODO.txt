@@ -4,6 +4,7 @@ TODO:
   * store data.
   * parse PUT request for escape characters.
 
+
 - Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
   data will be sent) -> this will need multithreading to handle multiple clients.
 - Make server logs easier to read and add colour

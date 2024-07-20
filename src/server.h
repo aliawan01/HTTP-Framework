@@ -24,7 +24,7 @@
 #define global static
 #define localPersist static
 
+#define ArrayCount(array) sizeof(array)/sizeof(array[0])
 
-// NOTE(ali): Project Header Files
-#include "file_handling.h"
+// Project Header Files
 #include "http_request.h"
