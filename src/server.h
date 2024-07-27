@@ -6,6 +6,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <re.h>
+#include <cJSON.h>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -19,8 +22,11 @@
 
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "re.lib")
+#pragma comment(lib, "cJSON.lib")
 
 // Macros
+#define internal static
 #define global static
 #define localPersist static
 
@@ -28,3 +34,4 @@
 
 // Project Header Files
 #include "http_request.h"
+#include "string_handling.h"

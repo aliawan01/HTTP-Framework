@@ -5,6 +5,11 @@ static void HTTP_Initialize(void) {
 	memset(route_info_array, 0, sizeof(HTTPRouteInfo)*INITIAL_ROUTE_INFO_ARRAY_SIZE);
 	route_info_array_index = -1;
 	num_of_added_elements = 0;
+
+	global_variable_key_value_pairs_array = malloc(sizeof(char*)*INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE);
+	memset(global_variable_key_value_pairs_array, 0, sizeof(char*)*INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE);
+	global_key_value_pairs_index = -1;
+	global_key_value_pairs_added_elements = 0;
 }
 
 static bool HTTP_HandleRoute(char* method, char* route, char* path_to_data) {
@@ -52,26 +57,6 @@ static void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
 			strcpy(search_dirs[index], dirs[index]);
 		}
 	}
-
-	// char* check_files[] = {"favicon.ico", "ginger.jpg", "checker.img"};
-	// for (int index = 0; index < search_dirs_size; index++) {
-	// 	char temp_buffer[256] = {0};
-	// 	if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
-	// 		search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
-
-	// 		sprintf(temp_buffer, "%s/%s", search_dirs[index], check_files[0]);
-	// 	}
-	// 	else {
-	// 		sprintf(temp_buffer, "%s%s", search_dirs[index], check_files[0]);
-	// 	}
-	// 	int file_size = HTTP_FindFileSize(temp_buffer);
-	// 	if (file_size != -1) {
-	// 		printf("%s is a valid file path!\n", temp_buffer);
-	// 	}
-	// 	else {
-	// 		printf("%s is a NOT a file path!\n", temp_buffer);
-	// 	}
-	// }
 }
 
 static bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) {
@@ -198,6 +183,225 @@ static void HTTP_Send404Page(SOCKET client_socket, char* route) {
 	printf("[SERVER] Sent 404 message for route: %s\n", route);
 }
 
+static void HTTP_ParsePOSTRequest(char* puts_request, char* decoded_route) {
+	int index = 0;
+	while (true) {
+		char* string_from_current_pos = puts_request+index;
+		if (index+4 < strlen(puts_request)-1) {
+			char original_char = puts_request[index+4];
+			puts_request[index+4] = 0;
+			if (!strcmp(string_from_current_pos, "\r\n\r\n")) {
+				puts_request[index+4] = original_char;
+				index += 4;
+				break;
+			}
+
+			puts_request[index+4] = original_char;
+		}
+		index++;
+	}
+
+	printf("[POST Request] %s\n", puts_request+index);
+	StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(puts_request+index);
+	char** key_value_pairs_array = request_key_value_pairs_array.array;
+	int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
+
+	if (global_variable_key_value_pairs_array[global_key_value_pairs_index] != NULL) {
+		global_key_value_pairs_index++;
+		if (global_key_value_pairs_index > INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE-1) {
+			printf("Realloc global_variable_key_value_pairs_array.\n");
+			global_key_value_pairs_added_elements++;
+			global_variable_key_value_pairs_array = realloc(global_variable_key_value_pairs_array, sizeof(char*)*(INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE + global_key_value_pairs_added_elements));
+		}
+	}
+
+	bool found_existing_match;
+	for (int i = 0; i < max_key_value_pairs_array_matches; i += 2) {
+		found_existing_match = false;
+		for (int x = 0; x < global_key_value_pairs_index; x += 2) {
+			if (!strcmp(key_value_pairs_array[i], global_variable_key_value_pairs_array[x])) {
+				found_existing_match = true;
+				ResizeStringInStringArray(global_variable_key_value_pairs_array, x+1, key_value_pairs_array[i+1]);
+			}
+		}
+
+		if (!found_existing_match) {
+			PushNewStringToStringArray(global_variable_key_value_pairs_array, global_key_value_pairs_index, key_value_pairs_array[i]);
+
+			global_key_value_pairs_index++;
+			if (global_key_value_pairs_index > INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE-1) {
+				printf("Realloc global_variable_key_value_pairs_array.\n");
+				global_key_value_pairs_added_elements++;
+				global_variable_key_value_pairs_array = realloc(global_variable_key_value_pairs_array, sizeof(char*)*(INITIAL_GLOBAL_KEY_VALUE_PAIRS_ARRAY_SIZE + global_key_value_pairs_added_elements));
+			}
+
+			PushNewStringToStringArray(global_variable_key_value_pairs_array, global_key_value_pairs_index, key_value_pairs_array[i+1]);
+			global_key_value_pairs_index++;
+		}
+	}
+
+	FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
+}
+
+static HTTPGETRequest HTTP_ParseGETRequest(char* request_path, StringArray parsed_header) {
+	bool require_json_response = false;
+	for (int index = 0; index < parsed_header.count; index += 2) {
+		if (!strcmp(parsed_header.array[index], "Content-Type") && 
+			!strcmp(parsed_header.array[index+1], "application/json")) {
+				printf("------------------------------\n");
+				printf("JUST GOT A JSON FORMAT REQUEST!!!\n");
+				printf("------------------------------\n");
+				require_json_response = true;
+				break;
+		}
+	}
+
+	int i = 0;
+	bool contains_custom_vars = false;
+	for (; i < strlen(request_path); i++) {
+		if (request_path[i] == '?') {
+			contains_custom_vars = true;
+			break;
+		}
+	}
+
+	if (contains_custom_vars) {
+		request_path[i] = 0;
+		i += 1;
+	}
+	
+	// Responding to the request with the data in route_info_array if
+	// an entry for the route exists.
+	char* data_to_send = {0};
+	int data_to_send_length;
+	char* http_response_header = {0};
+	char* path_to_file_at_route = {0};
+
+	for (int index = 0; index < route_info_array_index+1; index++) {
+		if (!strcmp(route_info_array[index].route, request_path)) {
+			path_to_file_at_route = route_info_array[index].path_to_file;
+		}
+	}
+
+	// Checking if the route can be mapped to a path to an existing file.
+	char file_type[10] = {0};
+	char temp_buffer[256] = {0};
+	if (HTTP_ExtractFileTypeFromFilePath(request_path, file_type)) {
+		for (int index = 0; index < search_dirs_size; index++) {
+			if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
+				search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
+
+				sprintf(temp_buffer, "%s/%s", search_dirs[index], request_path+1);
+			}
+			else {
+				sprintf(temp_buffer, "%s%s", search_dirs[index], request_path+1);
+			}
+			int file_size = HTTP_FindFileSize(temp_buffer);
+			if (file_size != -1) {
+				path_to_file_at_route = temp_buffer;
+				break;
+			}
+		}
+	}
+
+
+	if (path_to_file_at_route == NULL) {
+		return (HTTPGETRequest){NULL, NULL, 0};
+	}
+
+	data_to_send = HTTP_GetFileContents(path_to_file_at_route);
+	data_to_send_length = HTTP_FindFileSize(path_to_file_at_route);
+
+	// File was deleted or it's name was changed during runtime.
+	if (data_to_send_length == -1) {
+		return (HTTPGETRequest){NULL, NULL, 0};
+	}
+
+	// Not a recognised file type.
+	http_response_header = HTTP_GenHeaderFromFile(path_to_file_at_route);
+	if (http_response_header == NULL) {
+		printf("[ERROR] Couldn't generate header for %s\n", path_to_file_at_route);
+		return (HTTPGETRequest){NULL, NULL, 0};
+	}
+
+	if (contains_custom_vars) {
+		// Using regex to extract matching variables from the file contents buffer.
+		StringArray variable_matches = StrRegexGetMatches(data_to_send, "{{[^}]*}}");
+		char** original_file_vars = variable_matches.array;
+		int max_original_file_vars_matches = variable_matches.count;
+
+		char** trim_file_vars = malloc(sizeof(char*)*max_original_file_vars_matches);
+		for (int index = 0; index < max_original_file_vars_matches; index++) {
+			char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
+			// Remove `}}` from the string.
+			temp[strlen(temp)-2] = 0;
+			trim_file_vars[index] = temp;
+		}
+
+		// Extracting variables and values into key_value_pairs_array;
+		StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(request_path+i);
+		char** key_value_pairs_array = request_key_value_pairs_array.array;
+		int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
+
+
+		// Replacing variables in the file contents buffer with their values
+		for (int file_var_index = 0; file_var_index < max_original_file_vars_matches; file_var_index++) {
+			for (int key_index = 0; key_index < max_key_value_pairs_array_matches; key_index += 2) {
+				// Adding 2 to the trimmed file variable to remove `{{` at the start.
+				if (!strcmp(trim_file_vars[file_var_index]+2, key_value_pairs_array[key_index])) {
+					StrReplaceSubstringAllOccurance(&data_to_send, original_file_vars[file_var_index], key_value_pairs_array[key_index+1]);
+				}
+			}
+		}
+
+		FreeStringArray(original_file_vars, max_original_file_vars_matches);
+		FreeStringArray(trim_file_vars, max_original_file_vars_matches);
+		FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
+
+		data_to_send_length = strlen(data_to_send);
+	}
+
+	// Checking if any of the variables are defined in global_variable_key_value_pairs_array.
+	// Getting regex again because we do not want to override any of the variables which were
+	// changed by values defined in the route itself.
+	StringArray variable_matches = StrRegexGetMatches(data_to_send, "{{[^}]*}}");
+	char** original_file_vars = variable_matches.array;
+	int max_original_file_vars_matches = variable_matches.count;
+
+	char** trim_file_vars = malloc(sizeof(char*)*max_original_file_vars_matches);
+	for (int index = 0; index < max_original_file_vars_matches; index++) {
+		char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
+		// Remove `}}` from the string.
+		temp[strlen(temp)-2] = 0;
+		trim_file_vars[index] = temp;
+	}
+
+	bool found_matches = false;
+	for (int i = 0; i < max_original_file_vars_matches; i++) {
+		for (int x = 0; x < global_key_value_pairs_index; x += 2) {
+			// Adding 2 to the trimmed file variable to remove `{{` at the start.
+			if (!strcmp(trim_file_vars[i]+2, global_variable_key_value_pairs_array[x])) {
+				found_matches = true;
+				StrReplaceSubstringAllOccurance(&data_to_send, original_file_vars[i], global_variable_key_value_pairs_array[x+1]);
+			}
+		}
+	}
+
+	FreeStringArray(original_file_vars, max_original_file_vars_matches);
+	FreeStringArray(trim_file_vars, max_original_file_vars_matches);
+
+	if (found_matches) {
+		data_to_send_length = strlen(data_to_send);
+	}
+
+	return (HTTPGETRequest) {
+		.http_response_header = http_response_header,
+		.data_to_send = data_to_send,
+		.data_to_send_length = data_to_send_length
+	};
+
+}
+
 static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 	// Setting up and creating server socket.
 	WSADATA* wsaData;
@@ -256,7 +460,7 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			return 1;
 		}
 
-		char receiving_buffer[2056];
+		char receiving_buffer[2056] = {0};
 		int receiving_buffer_len = 2056;
 		int init_send_result = 1;
 
@@ -284,80 +488,39 @@ static int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			char* decoded_route = HTTP_DecodeURL(parsed_request_route);
 
-			// Responding to the request with the data in route_info_array if
-			// an entry for the route exists.
-			char* data_to_send = {0};
-			int data_to_send_length;
-			char* http_response_header = {0};
-			char* path_to_file_at_route = {0};
+			// Generating array of header keys and values
+			while (receiving_buffer[index] != '\r' && receiving_buffer[index+1] != '\n') {
+				index++;
+			}
+			index += 2;
 
-			for (int index = 0; index < route_info_array_index+1; index++) {
-				if (!strcmp(route_info_array[index].route, decoded_route)) {
-					path_to_file_at_route = route_info_array[index].path_to_file;
-				}
+			StringArray parsed_header = ParseHeaderIntoKeyValuePairString(receiving_buffer+index);
+
+			if (!strcmp(parsed_request_method, "POST")) {
+				HTTP_ParsePOSTRequest(receiving_buffer, decoded_route);
 			}
 
-			// Checking if the route can be mapped to a path to an existing file.
-			char file_type[10] = {0};
-			char temp_buffer[256] = {0};
-			if (HTTP_ExtractFileTypeFromFilePath(decoded_route, file_type)) {
-				for (int index = 0; index < search_dirs_size; index++) {
-					if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
-						search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
-
-						sprintf(temp_buffer, "%s/%s", search_dirs[index], decoded_route+1);
-					}
-					else {
-						sprintf(temp_buffer, "%s%s", search_dirs[index], decoded_route+1);
-					}
-					int file_size = HTTP_FindFileSize(temp_buffer);
-					if (file_size != -1) {
-						path_to_file_at_route = temp_buffer;
-						break;
-					}
-				}
-			}
-
-			// Route doesn't exist.
-			if (path_to_file_at_route == NULL) {
+			HTTPGETRequest output = HTTP_ParseGETRequest(decoded_route, parsed_header);
+			if (!output.data_to_send_length) {
 				HTTP_Send404Page(client_socket, decoded_route);
 				closesocket(client_socket);
 				free(decoded_route);
 				continue;
 			}
 
-			data_to_send = HTTP_GetFileContents(path_to_file_at_route);
-			data_to_send_length = HTTP_FindFileSize(path_to_file_at_route);
+			FreeStringArray(parsed_header.array, parsed_header.count);
 
-			// File was deleted or it's name was changed during runtime.
-			if (data_to_send_length == -1) {
-				HTTP_Send404Page(client_socket, decoded_route);
-				closesocket(client_socket);
-				free(decoded_route);
-				continue;
-			}
-
-			// Not a recognised file type.
-			http_response_header = HTTP_GenHeaderFromFile(path_to_file_at_route);
-			if (http_response_header == NULL) {
-				HTTP_Send404Page(client_socket, decoded_route);
-				closesocket(client_socket);
-				printf("[ERROR] Couldn't generate header for %s\n", path_to_file_at_route);
-				free(decoded_route);
-				continue;
-			}
-
-			printf("Html Code: %s\n", data_to_send);
-
-			send(client_socket, http_response_header, (int)strlen(http_response_header), 0);
-			send(client_socket, data_to_send, data_to_send_length, 0);
+			send(client_socket, output.http_response_header, (int)strlen(output.http_response_header), 0);
+			send(client_socket, output.data_to_send, output.data_to_send_length, 0);
 
 			printf("[SERVER] Bytes sent: %d\n", init_send_result);
-			printf("[SERVER] Data sent (HEADER): %s\n", http_response_header);
-			printf("[SERVER] Data sent (DATA): %s\n", data_to_send);
+			printf("[SERVER] Data sent (HEADER): %s\n", output.http_response_header);
+			printf("[SERVER] Data sent (DATA): %s\n", output.data_to_send);
+			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output.data_to_send));
+			printf("[SERVER] Data sent (Predicted DATA): %d\n", output.data_to_send_length);
 
-			free(data_to_send);
-			free(http_response_header);
+			free(output.http_response_header);
+			free(output.data_to_send);
 			free(decoded_route);
 
 		}

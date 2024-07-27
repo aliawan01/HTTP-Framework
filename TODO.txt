@@ -1,8 +1,30 @@
 TODO:
 
+- Support sending videos
+
 * PUT requests
-  * store data.
-  * parse PUT request for escape characters.
+  * Support DELETE, PUT (basically update I think)
+  * Get rid of the hideous code in the HTTP_ParsePOSTRequest and move over to 
+    storing the data in a database.
+ 
+* In HTTP_ParseGETRequest if we are asked to send the data back in json we will 
+  return all the global variables and variables defined in the route (the variables
+  defined in the route should override matching global variables).
+
+* We will need to need to implement local variables for each route in the database
+e.g. DATABASE LAYOUT:
+TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
+
+* Be able to send and receive and store data in json.
+
+- Make it so that we can change the value of variables which only exist on another
+  webpage and only send that webpage when the user wants it (in other words don'that
+  return the data at the POST request route if it does not match the route it is 
+  currently in).
+
+* Make it so that any variables which do not have a definition are automatically
+  removed from data_to_send.
+
 
 
 - Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
@@ -11,3 +33,5 @@ TODO:
 - Abstract sockets methods so that we can support Windows and Linux.
 - Add SSL/TLS encryption.
 - Logging data to the database.
+- Add some security checks to make sure that the message being sent is actually a 
+  HTTP request.

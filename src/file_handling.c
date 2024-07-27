@@ -1,7 +1,8 @@
 #include "server.h"
 
-static int HTTP_FindFileSize(char* file_name) {
-	FILE* file = fopen(file_name, "rb");
+static int HTTP_FindFileSize(char *file_name)
+{
+	FILE *file = fopen(file_name, "rb");
 	if (file == NULL) {
 		printf("FindFileSize(): Error couldn't open the file %s\n", file_name);
 		return -1;

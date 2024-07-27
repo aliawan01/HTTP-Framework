@@ -1,11 +1,46 @@
+<!DOCTYPE html>
 <html>
-<head>
-	<link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-	<h1>First heading</h1>
-	<p>If you are seeing this paragraph then the file was sent successfully.</p>
-	<img src="ginger.jpg" alt="Ginger Picture">
+  <head>
+    <script>
+      async function getData() {
+          const response = await fetch("/?fname=something&lname=good", {
+            method: "GET",
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }).then(response => {
+            console.log("Initial Response:", response);
+            return response.json()
+          }).then(final => console.log("Final Response:", final))
+      }
 
-</body>
+      getData();
+    </script>
+  </head>
+  <title>{{ fname }} {{lname}}</title>
+  <body>
+    {{fname}}
+      <h1>This is a header!</h1>
+      {{ lname   }}
+
+    <h2>POST Form</h2>
+    <form method="POST">
+      <label for="fname">First name:</label><br>
+      <input type="text" id="fname" name="fname" value="John"><br>
+      <label for="lname">Last name:</label><br>
+      <input type="text" id="lname" name="lname" value="Doe"><br><br>
+      <label for="pname">Original Pet name:</label><br>
+      <input type="text" id="pname" name="pname" value="Cat"><br>
+      <input type="submit" value="Submit">
+  </form>
+
+  <h2>GET Form</h2>
+  <form method="GET">
+    <label for="pname">Pet name:</label><br>
+    <input type="text" id="pname" name="pname" value="Camel"><br>
+    <input type="submit" value="Submit">
+</form>
+{{ pname }}
+{{ custom }}
+  </body>
 </html>

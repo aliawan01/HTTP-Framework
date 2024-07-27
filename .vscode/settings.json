@@ -2,6 +2,7 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "string.h": "c",
-        "http_request.h": "c"
+        "http_request.h": "c",
+        "server.h": "c"
     }
 }
