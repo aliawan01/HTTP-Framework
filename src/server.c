@@ -6,16 +6,16 @@
 #include "http_request.c"
 
 int main(void) {
-	// HTTP_Initialize();
+	HTTP_Initialize();
 
-	// char* dirs[] = {"static/", "../Web Server/static", "good", "C:/something", "C:/good_morning/ls", "C:\\Dev\\Real Work\\Web Server\\static\\"};
-	// HTTP_SetSearchDirectories(dirs, ArrayCount(dirs));
+	char* dirs[] = {"static/", "../Web Server/static", "good", "C:/something", "C:/good_morning/ls", "C:\\Dev\\Real Work\\Web Server\\static\\"};
+	HTTP_SetSearchDirectories(dirs, ArrayCount(dirs));
 
-	// HTTP_HandleRoute("GET", "/", "static/first_page.html");
-	// HTTP_HandleRedirectRoute("GET", "/other main website", "/");
+	HTTP_HandleRoute("GET", "/", "static/first_page.html");
+	HTTP_HandleRedirectRoute("GET", "/other main website", "/");
 
-	// printf("\n");
-	// HTTP_RunServer("127.0.0.1", "8000");
+	printf("\n");
+	HTTP_RunServer("127.0.0.1", "8000");
 
 	// char* puts_file = HTTP_GetFileContents("static/puts_output.txt");
 	// int index = 0;
@@ -30,8 +30,8 @@ int main(void) {
 	// 	printf("Header: %s, Value: %s\n", parsed_header.array[i], parsed_header.array[i+1]);
 	// }
 
-	cJSON* json_output = cJSON_Parse("{\"something\": 10, \"custom\": [40, 50, 60, {\"older\": \"than\"}]}");
-	printf("%s\n", cJSON_Print(json_output));
+	// cJSON* json_output = cJSON_Parse("{\"something\": 10, \"custom\": [40, 50, 60, {\"older\": \"than\"}]}");
+	// printf("%s\n", cJSON_Print(json_output));
 
 
 
