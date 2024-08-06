@@ -1,16 +1,25 @@
-TODO:
-
-- Support sending videos
-
-* PUT requests
+* PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
-  * Get rid of the hideous code in the HTTP_ParsePOSTRequest and move over to 
-    storing the data in a database.
- 
-* In HTTP_ParseGETRequest if we are asked to send the data back in json we will 
-  return all the global variables and variables defined in the route (the variables
-  defined in the route should override matching global variables).
+  * Be able to modify and delete local variables for a route if they exist.
 
+  * Currently working on HTTP_SetDefaultPUTDirectory
+    * Be able to create a new file in the default PUTs directory if we do not
+      have a JSON response. Create the file in the defaults puts directory and
+      then use the `Content-Location` header in the response to specify to the 
+      browser the physical location of the newly created file on the server.
+      Overwrite the existing data of a file if it already exists (if route_exists
+      is true). Then create a new route in global_route_and_json_array where
+      the route is the stripped route and the file attribute in the JSON data will
+      be set to the file we have been given.
+
+    * Also make so that we check if we have a JSON response before calling
+      the HTTP_ParsePOSTRequest since our POST request will only handle JSON data.
+
+
+* Get rid of the route_info_array since we can store all of the file paths
+  we need in global_route_and_json_array.
+
+ 
 * We will need to need to implement local variables for each route in the database
 e.g. DATABASE LAYOUT:
 TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
@@ -24,8 +33,10 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
 
 * Make it so that any variables which do not have a definition are automatically
   removed from data_to_send.
+* Allow users to specify what HTTP methods a certain route will allow (e.g. by creating
+  a seperate struct for a route).
 
-
+* Support parsing lists in json.
 
 - Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
   data will be sent) -> this will need multithreading to handle multiple clients.
@@ -35,3 +46,11 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
 - Logging data to the database.
 - Add some security checks to make sure that the message being sent is actually a 
   HTTP request.
+- Support sending videos
+- Fill out the rest of the socket functions in platform.h and test them to make
+  sure they work on Linux as well.
+
+NOTES:
+* Could probably just separate the query string from the actual route first and then
+  pass them into the GET and POST handler functions seperatley instead of having to
+  find them manually in each one.

@@ -1,23 +1,130 @@
-#include "server.h"
-#define StrReplaceSubstringAllOccurance(a, b, c) while(StrReplaceSubstringFirstOccurance(a, b, c))
-#define PushNewStringToStringArray(array, index, string) \
-	array[index] = malloc(strlen(string)+1);\
-	memset(array[index], 0, strlen(string)+1);\
-	strcpy(array[index], string);
+#include "global.h"
+#include "string_handling.h"
 
-#define ResizeStringInStringArray(array, index, string) \
-	array[index] = realloc(array[index], strlen(string)+1);\
-	memset(array[index], 0, strlen(string)+1);\
-	strcpy(array[index], string);
+bool IsInteger(char* string) {
+	bool is_int = true;
+	for (int i = 0; i < strlen(string); i++) {
+		if (string[i] < 48 || string[i] > 57) {
+			is_int = false;
+			break;
+		}
+	}
 
-#define FreeStringArray(array, max_size) \
-	for (int x = 0; x < max_size; x++) {\
-		free(array[x]);\
-	}\
-	free(array);
+	return is_int;
+}
+
+char* DecodeURL(char* url) {
+    char* decoded_url = malloc(strlen(url)+1);
+    memset(decoded_url, 0, strlen(url)+1);
+
+    int url_index = 0;
+    int decoded_index = 0;
+    for (;url_index < strlen(url); url_index++, decoded_index++) {
+        if (url[url_index] == '+') {
+            decoded_url[decoded_index] = ' '; 
+        }
+        else if (url[url_index] == '%') {
+            char escape_character;
+            char escape_code[3] = {0};
+            escape_code[0] = url[url_index+1];
+            escape_code[1] = url[url_index+2];
+            url_index += 2;
+
+            // Matching escape character
+            if (!strcmp(escape_code, "20")) {
+                escape_character = ' ';
+            }
+            else if (!strcmp(escape_code, "3C")) {
+                escape_character = '<';
+            }
+            else if (!strcmp(escape_code, "3E")) {
+                escape_character = '>';
+            }
+            else if (!strcmp(escape_code, "23")) {
+                escape_character = '#';
+            }
+            else if (!strcmp(escape_code, "25")) {
+                escape_character = '%';
+            }
+            else if (!strcmp(escape_code, "2B")) {
+                escape_character = '+';
+            }
+            else if (!strcmp(escape_code, "7B")) {
+                escape_character = '{';
+            }
+            else if (!strcmp(escape_code, "7D")) {
+                escape_character = '}';
+            }
+            else if (!strcmp(escape_code, "7C")) {
+                escape_character = '|';
+            }
+            else if (!strcmp(escape_code, "5C")) {
+                escape_character = '\\';
+            }
+            else if (!strcmp(escape_code, "5E")) {
+                escape_character = '^';
+            }
+            else if (!strcmp(escape_code, "7E")) {
+                escape_character = '~';
+            }
+            else if (!strcmp(escape_code, "5B")) {
+                escape_character = '[';
+            }
+            else if (!strcmp(escape_code, "5D")) {
+                escape_character = ']';
+            }
+            else if (!strcmp(escape_code, "60")) {
+                escape_character = '‘';
+            }
+            else if (!strcmp(escape_code, "3B")) {
+                escape_character = ';';
+            }
+            else if (!strcmp(escape_code, "2F")) {
+                escape_character = '/';
+            }
+            else if (!strcmp(escape_code, "3F")) {
+                escape_character = '?';
+            }
+            else if (!strcmp(escape_code, "3A")) {
+                escape_character = ':';
+            }
+            else if (!strcmp(escape_code, "40")) {
+                escape_character = '@';
+            }
+            else if (!strcmp(escape_code, "3D")) {
+                escape_character = '=';
+            }
+            else if (!strcmp(escape_code, "26")) {
+                escape_character = '&';
+            }
+            else if (!strcmp(escape_code, "24")) {
+                escape_character = '$';
+            }
+            else if (!strcmp(escape_code, "21")) {
+                escape_character = '!';
+            }
+            else if (!strcmp(escape_code, "2A")) {
+                escape_character = '*';
+            }
+            else if (!strcmp(escape_code, "2D")) {
+                escape_character = '-';
+            }
+            else if (!strcmp(escape_code, "2E")) {
+                escape_character = '.';
+            }
+
+            decoded_url[decoded_index] = escape_character;
+        }
+        else {
+            decoded_url[decoded_index] = url[url_index];
+        }
+    }
 
 
-static StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
+    return decoded_url;
+}
+
+StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
 	char** header_key_value_pairs_array = malloc(sizeof(char*)*50);
 	int header_key_value_pairs_index = 0;
 	int i = 0;
@@ -59,7 +166,7 @@ static StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
 	};
 }
 
-static StringArray ParseURIKeyValuePairString(char* uri_string) {
+StringArray ParseURIKeyValuePairString(char* uri_string) {
 	char** key_value_pairs_array = malloc(sizeof(char*)*200);
 	int key_value_array_index = 0;
 	int i = 0;
@@ -90,7 +197,7 @@ static StringArray ParseURIKeyValuePairString(char* uri_string) {
 	};
 }
 
-static StringArray StrRegexGetMatches(char* source, char* pattern) {
+StringArray StrRegexGetMatches(char* source, char* pattern) {
 	int match_length = 0;
 	int match_id = 0;
 	int match_id_offset = 0;
@@ -122,7 +229,7 @@ static StringArray StrRegexGetMatches(char* source, char* pattern) {
 	};
 }
 
-static char* RemoveWhitespaceFrontAndBack(char* string, int front_offset, int back_offset) {
+char* RemoveWhitespaceFrontAndBack(char* string, int front_offset, int back_offset) {
 	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
 	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
 	//		 iteration of the while loop.
@@ -152,7 +259,7 @@ static char* RemoveWhitespaceFrontAndBack(char* string, int front_offset, int ba
 	return string_copy;
 }
 
-static bool StrReplaceSubstringFirstOccurance(char** source, char* substring, char* replace) {
+bool StrReplaceSubstringFirstOccurance(char** source, char* substring, char* replace) {
     char* substring_occurance = strstr(*source, substring);
     if (substring_occurance == NULL) {
         return false;

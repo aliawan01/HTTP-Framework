@@ -1,2 +1,1 @@
-cd ..\
-devenv /debugexe build\server.exe&
+devenv /debugexe build\bin\HTTPServer.exe&

@@ -1,3 +1,3 @@
 @echo off
 
-build\server.exe
+build\bin\HTTPServer.exe

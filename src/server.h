@@ -21,17 +21,14 @@
 #include <iphlpapi.h>
 
 
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "re.lib")
-#pragma comment(lib, "cJSON.lib")
+//#pragma comment(lib, "Ws2_32.lib")
+//#pragma comment(lib, "re.lib")
+//#pragma comment(lib, "cJSON.lib")
 
 // Macros
 #define internal static
 #define global static
-#define localPersist static
+#define local_persist static
 
 #define ArrayCount(array) sizeof(array)/sizeof(array[0])
-
-// Project Header Files
-#include "http_request.h"
-#include "string_handling.h"
+    
