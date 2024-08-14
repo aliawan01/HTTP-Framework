@@ -1,21 +1,22 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script>
-      async function getData() {
-          const response = await fetch("/?pname=This work!!!", {
-            method: "POST",
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }).then(response => {
-            console.log("Initial Response:", response);
-            return response.json()
-          }).then(final => console.log("Final Response:", final))
-      }
+    <!-- <script> -->
+    <!--   async function getData() { -->
+    <!--       const response = await fetch("/new_route?pname=This work!!!", { -->
+    <!--           method: "DELETE", -->
+    <!--           headers: { -->
+    <!--               'Content-Type': 'text/html' -->
+    <!--           }, -->
+    <!--           // body: "<html><h1>New File is not craeted by the getData() function</h1><p>Trying to occupy some IT WAS CHANGED!!!</p></html>" -->
+    <!--       }).then(response => { -->
+    <!--           console.log("Initial Response:", response); -->
+    <!--           return response.json() -->
+    <!--       }).then(final => console.log("Final Response:", final)) -->
+    <!--   } -->
 
-      getData();
-    </script>
+    <!--   getData(); -->
+    <!-- </script> -->
   </head>
   <title>{{ fname }} {{lname}}</title>
   <body>
@@ -42,5 +43,7 @@
 </form>
 {{ pname }}
 {{ custom }}
+{{ name }}
+{{ surname }}
   </body>
 </html>

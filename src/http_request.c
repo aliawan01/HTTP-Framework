@@ -1,30 +1,24 @@
-#include "global.h"
+#include "util.h"
 #include "http_request.h"
 #include "string_handling.h"
 #include "file_handling.h"
-
-#define ResizeArrayIfFull(array, index, num_of_added_elements, MAX_SIZE, size_per_element) \
-	if (index > MAX_SIZE-1) {\
-		printf("Realloc %s.\n", #array);\
-		num_of_added_elements++;\
-		array = realloc(array, size_per_element*(MAX_SIZE+num_of_added_elements));\
-	}
-
+#include <time.h>
 
 void HTTP_Initialize(void) {
-	route_info_array = malloc(sizeof(HTTPRouteAndFilePath)*INITIAL_ROUTE_INFO_ARRAY_SIZE);
-	memset(route_info_array, 0, sizeof(HTTPRouteAndFilePath)*INITIAL_ROUTE_INFO_ARRAY_SIZE);
-	route_info_array_index = -1;
-	num_of_added_elements = 0;
+    // TODO: Perhaps allow the user to specify the size of the global and scratch arena.
+    allocator = malloc(sizeof(Allocator));
+    allocator->global_arena = malloc(sizeof(Arena));
+    allocator->scratch_arena = malloc(sizeof(Arena));
 
-	global_route_and_json_array = malloc(sizeof(HTTPRouteJSON)*INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
-	memset(global_route_and_json_array, 0, sizeof(HTTPRouteJSON)*INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
+    ArenaInit(allocator->global_arena, MB(500));
+    ArenaInit(allocator->scratch_arena, MB(50));
+
+	global_route_and_json_array = ArenaAlloc(allocator->global_arena, sizeof(HTTPRouteJSON)*INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
 	global_route_and_json_index = -1;
-	global_route_and_json_added_elements = 0;
 }
 
 
-bool HTTP_HandleRoute(char* method, char* route, char* path_to_data) {
+bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator* allocator, HTTPRequestInfo*, HTTPResponse*)) {
 	// Checking if the route is in the correct format.
 	if (route[0] != '/') {
 		printf("[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
@@ -32,50 +26,34 @@ bool HTTP_HandleRoute(char* method, char* route, char* path_to_data) {
 	}
 
 	// Checking if the route already exists.
-	for (int index = 0; index < route_info_array_index+1; index++) {
-		if (!strcmp(route_info_array[index].route, route)) {
+	for (int index = 0; index < global_route_and_json_index+1; index++) {
+		if (!strcmp(global_route_and_json_array[index].route, route)) {
 			printf("[WARNING] HTTP_HandleRoute() data for route: %s already exists.\n", route);
 			return false;
 		}
 	}
 
-	// Checking if the file exists.
-	if (HTTP_FindFileSize(path_to_data) == -1) {
-		printf("[ERROR] HTTP_HandleRoute() No file exists at for file path: %s\n", path_to_data);
-		return false;
-	}
-
-	route_info_array_index++;
-	ResizeArrayIfFull(route_info_array, route_info_array_index, num_of_added_elements, INITIAL_ROUTE_INFO_ARRAY_SIZE, sizeof(HTTPRouteAndFilePath));
-
 	global_route_and_json_index++;
-	ResizeArrayIfFull(global_route_and_json_array, global_route_and_json_index, global_route_and_json_added_elements, INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE, sizeof(HTTPRouteJSON));
+    Assert(global_route_and_json_index < INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
 
-    char* alloc_route = malloc(strlen(route)+1);
-    strcpy(alloc_route, route);
-
-	route_info_array[route_info_array_index] = (HTTPRouteAndFilePath) {
-		.route = alloc_route,
-		.path_to_file = path_to_data
-	};
-
-	cJSON* route_json_data_obj = cJSON_CreateObject();
-	cJSON_AddStringToObject(route_json_data_obj, "file", path_to_data);
 	global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
-		.route = route,
-		.data = route_json_data_obj
+        .method = HTTP_StringDup(allocator->global_arena, method),
+		.route = HTTP_StringDup(allocator->global_arena, route),
+        .response_func = response_func,
+        .data = cJSON_CreateObject() 
 	};
 
-	printf("Added Route: %s, Path to File: %s\n", route_info_array[route_info_array_index].route, route_info_array[route_info_array_index].path_to_file);
+    // TODO: @memory_leak
+	printf("Added Route: %s, Method: %s, with_resonse_func, Data: %s\n", global_route_and_json_array[global_route_and_json_index].route, global_route_and_json_array[global_route_and_json_index].method, cJSON_Print(global_route_and_json_array[global_route_and_json_index].data));
 	return true;
 }
 
 void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
 	if (dirs != NULL) {
-		search_dirs = malloc(sizeof(char*)*dirs_size);
+		search_dirs = ArenaAlloc(allocator->global_arena, sizeof(char*)*dirs_size);
 		search_dirs_size = dirs_size;
 		for (int index = 0; index < search_dirs_size; index++) {
-			search_dirs[index] = malloc(strlen(dirs[index]));
+			search_dirs[index] = ArenaAlloc(allocator->global_arena, strlen(dirs[index]));
 			strcpy(search_dirs[index], dirs[index]);
 		}
 	}
@@ -108,52 +86,51 @@ void HTTP_SetDefaultPUTDirectory(char* default_dir) {
     }
 
     if (valid_path) {
-        put_request_default_dir = malloc(strlen(default_dir)+1);
+        put_request_default_dir = ArenaAlloc(allocator->global_arena, strlen(default_dir)+1);
         strcpy(put_request_default_dir, default_dir);
     }
     else {
-        put_request_default_dir = malloc(4);
+        put_request_default_dir = ArenaAlloc(allocator->global_arena, 4);
         strcpy(put_request_default_dir, "");
     }
 }
 
-bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) {
-	// Checking if the route is in the correct format.
-	if (origin_route[0] != '/') {
-		printf("[ERROR] HTTP_HandleRedirectRoute() origin route given: `%s` is not in the correct format.\n", origin_route);
-		return false;
-	}
+/* bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) { */
+/* 	// Checking if the route is in the correct format. */
+/* 	if (origin_route[0] != '/') { */
+/* 		printf("[ERROR] HTTP_HandleRedirectRoute() origin route given: `%s` is not in the correct format.\n", origin_route); */
+/* 		return false; */
+/* 	} */
 
-	bool redirect_route_exists = false;
-	int redirect_route_index;
+/* 	bool redirect_route_exists = false; */
+/* 	int redirect_route_index; */
 
-	for (int index = 0; index < route_info_array_index+1; index++) {
-		if (!strcmp(route_info_array[index].route, origin_route)) {
-			printf("[ERROR] HTTP_HandleRedirectRoute() origin route given already exists: `%s`\n", origin_route);
-			return false;
-		}
-		else if (!strcmp(route_info_array[index].route, redirect_route)) {
-			redirect_route_exists = true;
-			redirect_route_index = index;
-		}
-	}
+/* 	for (int index = 0; index < route_info_array_index+1; index++) { */
+/* 		if (!strcmp(route_info_array[index].route, origin_route)) { */
+/* 			printf("[ERROR] HTTP_HandleRedirectRoute() origin route given already exists: `%s`\n", origin_route); */
+/* 			return false; */
+/* 		} */
+/* 		else if (!strcmp(route_info_array[index].route, redirect_route)) { */
+/* 			redirect_route_exists = true; */
+/* 			redirect_route_index = index; */
+/* 		} */
+/* 	} */
 
-	if (!redirect_route_exists) {
-		printf("[ERROR] HTTP_HandleRedirectRoute() redirection route given does not exist: %s\n", redirect_route);
-		return false;
-	}
+/* 	if (!redirect_route_exists) { */
+/* 		printf("[ERROR] HTTP_HandleRedirectRoute() redirection route given does not exist: %s\n", redirect_route); */
+/* 		return false; */
+/* 	} */
 
-	route_info_array_index++;
-	ResizeArrayIfFull(route_info_array, route_info_array_index, num_of_added_elements, INITIAL_ROUTE_INFO_ARRAY_SIZE, sizeof(HTTPRouteAndFilePath));
+/* 	route_info_array_index++; */
 	
-	route_info_array[route_info_array_index] = (HTTPRouteAndFilePath) {
-		.route = origin_route,
-		.path_to_file = route_info_array[redirect_route_index].path_to_file
-	};
+/* 	route_info_array[route_info_array_index] = (HTTPRouteAndFilePath) { */
+/* 		.route = origin_route, */
+/* 		.path_to_file = route_info_array[redirect_route_index].path_to_file */
+/* 	}; */
 
-	printf("Added Redirect Route: origin route: %s, redirect route: %s\n", origin_route, redirect_route);
-	return true;
-}
+/* 	printf("Added Redirect Route: origin route: %s, redirect route: %s\n", origin_route, redirect_route); */
+/* 	return true; */
+/* } */
 
 static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type) {
 	int index = 0;
@@ -179,7 +156,16 @@ static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type
 	return true;
 }
 
-static char* HTTP_GenHeaderFromFile(char* path_to_file) {
+
+// TODO: Needs to be able to create a new \r\n entry for each header.
+static char* HTTP_CreateResponseHeader(Allocator* allocator, enum HTTPStatusCode status_code, char* headers) {
+	char* http_response_header = ArenaAlloc(allocator->global_arena, 1024);
+	sprintf(http_response_header, "HTTP/1.1 %s\r\n%s\r\n\r\n", HTTP_StatusCodeStrings[status_code], headers);
+    
+	return http_response_header;
+}
+
+static char* HTTP_CreateResponseHeaderFromFile(Allocator* allocator, char* path_to_file, bool created_new_entry) {
 	// Extracting file type into a separate string.
 	char file_type[24] = {0};
 	HTTP_ExtractFileTypeFromFilePath(path_to_file, file_type);
@@ -233,9 +219,18 @@ static char* HTTP_GenHeaderFromFile(char* path_to_file) {
 		return NULL;
 	}
 
-	char* http_response_header = malloc(1024);
-	memset(http_response_header, 0, 1024);
-	sprintf(http_response_header, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n\r\n", content_type);
+
+    int status_code;
+    if (created_new_entry) {
+        status_code = 201;
+    }
+    else {
+        status_code = 200;
+    }
+
+	char* http_response_header = ArenaAlloc(allocator->global_arena, 1024);
+	sprintf(http_response_header, "HTTP/1.1 %d OK\r\nContent-Type: %s\r\n\r\n", status_code, content_type);
+
 	return http_response_header;
 }
 
@@ -246,66 +241,57 @@ void HTTP_Send404Page(SOCKET client_socket, char* route) {
 	printf("[SERVER] Sent 404 message for route: %s\n", route);
 }
 
-static void HTTP_ConvertContentTypeToFileExtension(char* content_type, char* file_type) {
+static void HTTP_ConvertContentTypeToFileExtension(char* content_type, char* file_extension) {
 	if (!strcmp(content_type, "text/html")) {
-		strcpy(file_type, "html");
+		strcpy(file_extension, "html");
 	}
 	else if (!strcmp(content_type, "text/css")) {
-		strcpy(file_type, "css");
+		strcpy(file_extension, "css");
 	}
 	else if (!strcmp(content_type, "text/javascript")) {
-		strcpy(file_type, "js");
+		strcpy(file_extension, "js");
 	}
 	else if (!strcmp(content_type, "text/markdown")) {
-		strcpy(file_type, "md");
+		strcpy(file_extension, "md");
 	}
 	else if (!strcmp(content_type, "application/json")) {
-		strcpy(file_type, "json");
+		strcpy(file_extension, "json");
 	}
 	else if (!strcmp(content_type, "image/apng")) {
-		strcpy(file_type, "apng");
+		strcpy(file_extension, "apng");
 	}
 	else if (!strcmp(content_type, "image/avif")) {
-		strcpy(file_type, "avif");
+		strcpy(file_extension, "avif");
 	}
 	else if (!strcmp(content_type, "image/jpeg")) {
-		strcpy(file_type, "jpeg");
+		strcpy(file_extension, "jpeg");
 	}
 	else if (!strcmp(content_type, "image/jpg")) {
-		strcpy(file_type, "jpg");
+		strcpy(file_extension, "jpg");
 	}
 	else if (!strcmp(content_type, "image/png")) {
-		strcpy(file_type, "png");
+		strcpy(file_extension, "png");
 	}
 	else if (!strcmp(content_type, "image/svg+xml")) {
-		strcpy(file_type, "svg");
+		strcpy(file_extension, "svg");
 	}
 	else if (!strcmp(content_type, "image/webp")) {
-		strcpy(file_type, "webp");
+		strcpy(file_extension, "webp");
 	}
 	else if (!strcmp(content_type, "image/x-ico")) {
-		strcpy(file_type, "ico");
+		strcpy(file_extension, "ico");
 	}
 }
 
-static void HTTP_ParsePUTRequest(HTTPRequestInfo* request_info, bool is_json_response) {
-    char* request_route;
-    if (request_info->contains_query_string) {
-        request_route = request_info->stripped_route;
-    }
-    else {
-        request_route = request_info->decoded_route;
-    }
-
+#if 0
+static bool HTTP_ParsePUTRequest(Arena* arena, HTTPRequestInfo* request_info, bool is_json_response) {
 	printf("[PUT Request Data] %s\n", request_info->request_body);
-
-	// Resizing global_route_and_json_array if it is full
-	ResizeArrayIfFull(global_route_and_json_array, global_route_and_json_index, global_route_and_json_added_elements, INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE, sizeof(HTTPRouteJSON));
+    bool created_new_entry = false;
 
     bool route_exists = false;
     int route_index = 0;
     for (; route_index < global_route_and_json_index+1; route_index++) {
-        if (!strcmp(global_route_and_json_array[route_index].route, request_route)) {
+        if (!strcmp(global_route_and_json_array[route_index].route, request_info->route_to_use)) {
             route_exists = true;
             break;
         }
@@ -316,47 +302,125 @@ static void HTTP_ParsePUTRequest(HTTPRequestInfo* request_info, bool is_json_res
             // Overwriting JSON data at route if it exists.
             cJSON_Delete(global_route_and_json_array[route_index].data);
             global_route_and_json_array[route_index].data = cJSON_Parse(request_info->request_body);
+            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
         }
         else {
             // Creating a new route for JSON data if it doesn't exist.
+            created_new_entry = true;
             global_route_and_json_index++;
 
             global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
-                .route = strdup(request_route),
+                .route = HTTP_StringDup(arena, request_info->route_to_use),
                 .data = cJSON_Parse(request_info->request_body)
             };
+            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[global_route_and_json_index].data));
         }
 
-        printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
     }
     else {
-        char file_type[48] = {0};
-        HTTP_ConvertContentTypeToFileExtension(request_info->content_type, file_type);
+        char file_extension[24] = {0};
+        HTTP_ConvertContentTypeToFileExtension(request_info->content_type, file_extension);
+        char file_name[256] = {0};
+        if (!strcmp(request_info->route_to_use, "/")) {
+            strcpy(file_name, "root");
+        }
+        else {
+            strcpy(file_name, request_info->route_to_use+1);
+        }
+
+        char full_file_path[300] = {0};
+        if (put_request_default_dir[0] == 0) {
+            sprintf(full_file_path, "%s.%s", file_name, file_extension);
+        }
+        else {
+            sprintf(full_file_path, "%s/%s.%s", put_request_default_dir, file_name, file_extension);
+        }
+
+        if (HTTP_FindFileSize(full_file_path) == -1) {
+            printf("[PUTS Request Handler] Couldn't find an existing file at file path `%s` creating a new file.\n", full_file_path);
+        }
+
+        // TODO: Find a better way to do logging.
+        if (HTTP_OverwriteFileContents(full_file_path, request_info->request_body)) {
+            printf("[PUTS Request Handler] Successfully overwrote data in file at file path `%s`.\n", full_file_path);
+        }
+
+        if (route_exists) {
+            cJSON* elem = NULL;
+            bool found_existing_match = false;
+            cJSON_ArrayForEach(elem, global_route_and_json_array[route_index].data) {
+                if (!strcmp(elem->string, "file")) {
+					found_existing_match = true;
+                    cJSON_SetValuestring(elem, full_file_path);
+                    break;
+                }
+            }
+
+            if (!found_existing_match) {
+                cJSON_AddItemToObject(global_route_and_json_array[route_index].data, "file", cJSON_CreateString(full_file_path));
+            }
+            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
+        }
+        else {
+            printf("[PUT Request] Created a new entry in global_route_and_json_array for file at file path `%s`.\n", full_file_path);
+
+            created_new_entry = true;
+            cJSON* item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "file", full_file_path);
+
+            global_route_and_json_index++;
+            global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
+                .route = HTTP_StringDup(arena, request_info->route_to_use),
+                .data = item
+            };
+
+            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[global_route_and_json_index].data));
+        }
+
     }
 
+    return created_new_entry;
 }
 
-static void HTTP_ParsePOSTRequest(HTTPRequestInfo* request_info) {
-    char* request_route;
-    if (request_info->contains_query_string) {
-        request_route = request_info->stripped_route;
+static bool HTTP_ParseDELETERequest(HTTPRequestInfo* request_info) {
+    bool successfully_deleted_entry = false;
+	printf("[DELETE Request] %s\n", request_info->request_body);
+    for (int index = 0; index < global_route_and_json_index+1; index++) {
+        if (!strcmp(request_info->route_to_use, global_route_and_json_array[index].route)) {
+            printf("[DELETE Request] Found a matching route at index: %d\n", index);
+            // TODO: @memory_leak
+            printf("[DELETE Request] Data is route: `%s`, JSON Data: %s\n", global_route_and_json_array[index].route, cJSON_Print(global_route_and_json_array[index].data));
+
+            successfully_deleted_entry = true;
+            free(global_route_and_json_array[index].route);
+            cJSON_Delete(global_route_and_json_array[index].data);
+
+            // Checking if there was only 1 element in global_route_and_json_array initially.
+            if (global_route_and_json_index-1 == -1) {
+                global_route_and_json_index--;
+            }
+            else {
+                memmove(global_route_and_json_array, global_route_and_json_array+1, sizeof(HTTPRouteJSON)*global_route_and_json_index);
+                memset(global_route_and_json_array+global_route_and_json_index, 0, sizeof(HTTPRouteJSON));
+                global_route_and_json_index--;
+            }
+        }
     }
-    else {
-        request_route = request_info->decoded_route;
-    }
+
+    return successfully_deleted_entry;
+}
+
+static void HTTP_ParsePOSTRequest(Arena* arena, HTTPRequestInfo* request_info) {
 	printf("[POST Request Data] %s\n", request_info->request_body);
 
 	StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(request_info->request_body);
 	char** key_value_pairs_array = request_key_value_pairs_array.array;
 	int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
 
-	// Resizing global_route_and_json_array if it is full
-	ResizeArrayIfFull(global_route_and_json_array, global_route_and_json_index, global_route_and_json_added_elements, INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE, sizeof(HTTPRouteJSON));
-
 	bool route_exists = false;
 	int route_index = 0;
 	for (; route_index < global_route_and_json_index+1; route_index++) {
-		if (!strcmp(global_route_and_json_array[route_index].route, request_route)) {
+		if (!strcmp(global_route_and_json_array[route_index].route, request_info->route_to_use)) {
 			route_exists = true;
 			break;
 		}
@@ -391,10 +455,9 @@ static void HTTP_ParsePOSTRequest(HTTPRequestInfo* request_info) {
 			cJSON* elem = NULL;
 			cJSON_ArrayForEach(elem, global_route_and_json_array[route_index].data) {
 				if (!strcmp(elem->string, key_value_pairs_array[index])) {
-                    cJSON* current = NULL;
 					found_existing_match = true;
 
-                    item->string = malloc(strlen(elem->string)+1);
+                    item->string = ArenaAlloc(arena, strlen(elem->string)+1);
                     strcpy(item->string, elem->string);
                     cJSON_ReplaceItemViaPointer(global_route_and_json_array[route_index].data, elem, item);
                     elem = item;
@@ -413,26 +476,16 @@ static void HTTP_ParsePOSTRequest(HTTPRequestInfo* request_info) {
 	FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
 }
 
-static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool is_json_response) {
-	// Responding to the request with the data in route_info_array if
-	// an entry for the route exists.
+static HTTPGETRequest HTTP_ParseGETRequest(Arena* arena, HTTPRequestInfo* request_info, bool is_json_response, bool created_new_entry, bool deleted_entry) {
 	char* data_to_send = {0};
 	int data_to_send_length;
 	char* http_response_header = {0};
 	char* path_to_file_at_route = {0};
 
-    char* request_path;
-    if (request_info->contains_query_string) {
-        request_path = request_info->stripped_route;
-    }
-    else {
-        request_path = request_info->decoded_route;
-    }
-
     int file_path_index = 0;
     bool route_exists = false;
 	for (; file_path_index < global_route_and_json_index+1; file_path_index++) {
-		if (!strcmp(global_route_and_json_array[file_path_index].route, request_path)) {
+		if (!strcmp(global_route_and_json_array[file_path_index].route, request_info->route_to_use)) {
             route_exists = true;
             cJSON* elem = NULL;
             cJSON_ArrayForEach(elem, global_route_and_json_array[file_path_index].data) {
@@ -445,18 +498,19 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
 	}
 
 
-    if (is_json_response) {
+    if (deleted_entry) {
+        http_response_header = HTTP_StringDup(arena, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
+        data_to_send = HTTP_StringDup(arena, "<html><h1>Successfully deleted the resource you told us to delete.</h1></html>");
+        data_to_send_length = strlen(data_to_send);
+    }
+    else if (is_json_response) {
         printf("-------------------------------\n");
-        printf("Sending a JSON Response at request path: %s\n", request_path);
+        printf("Sending a JSON Response at request path: %s\n", request_info->route_to_use);
         printf("-------------------------------\n");
 
-        if (path_to_file_at_route == NULL) {
-            return (HTTPGETRequest){NULL, NULL, 0};
-        }
-
-        http_response_header = HTTP_GenHeaderFromFile(".json");
+        http_response_header = HTTP_CreateResponseHeaderFromFile(".json", created_new_entry);
         if (http_response_header == NULL) {
-            printf("[ERROR] Couldn't generate JSON header for request path: %s\n", request_path);
+            printf("[ERROR] Couldn't generate JSON header for request path: %s\n", request_info->route_to_use);
             return (HTTPGETRequest){NULL, NULL, 0};
         }
         
@@ -499,7 +553,7 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
                     if (!strcmp(elem->string, key_value_pairs_array[key_index])) {
                         found_match = true;
 
-                        item->string = malloc(strlen(elem->string)+1);
+                        item->string = ArenaAlloc(arena, strlen(elem->string)+1);
                         strcpy(item->string, elem->string);
                         cJSON_ReplaceItemViaPointer(json_obj, elem, item);
                         elem = item;
@@ -529,15 +583,15 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
         char file_type[10] = {0};
         char temp_buffer[256] = {0};
 
-        if (path_to_file_at_route == NULL && HTTP_ExtractFileTypeFromFilePath(request_path, file_type)) {
+        if (path_to_file_at_route == NULL && HTTP_ExtractFileTypeFromFilePath(request_info->route_to_use, file_type)) {
             for (int index = 0; index < search_dirs_size; index++) {
                 if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
                     search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
 
-                    sprintf(temp_buffer, "%s/%s", search_dirs[index], request_path+1);
+                    sprintf(temp_buffer, "%s/%s", search_dirs[index], request_info->route_to_use+1);
                 }
                 else {
-                    sprintf(temp_buffer, "%s%s", search_dirs[index], request_path+1);
+                    sprintf(temp_buffer, "%s%s", search_dirs[index], request_info->route_to_use+1);
                 }
                 int file_size = HTTP_FindFileSize(temp_buffer);
                 if (file_size != -1) {
@@ -561,7 +615,7 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
         }
 
         // Not a recognised file type.
-        http_response_header = HTTP_GenHeaderFromFile(path_to_file_at_route);
+        http_response_header = HTTP_CreateResponseHeaderFromFile(path_to_file_at_route, created_new_entry);
         if (http_response_header == NULL) {
             printf("[ERROR] Couldn't generate header for %s\n", path_to_file_at_route);
             return (HTTPGETRequest){NULL, NULL, 0};
@@ -573,7 +627,7 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
             char** original_file_vars = variable_matches.array;
             int max_original_file_vars_matches = variable_matches.count;
 
-            char** trim_file_vars = malloc(sizeof(char*)*max_original_file_vars_matches);
+            char** trim_file_vars = ArenaAlloc(arena, sizeof(char*)*max_original_file_vars_matches);
             for (int index = 0; index < max_original_file_vars_matches; index++) {
                 char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
                 // Remove `}}` from the string.
@@ -611,7 +665,7 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
         char** original_file_vars = variable_matches.array;
         int max_original_file_vars_matches = variable_matches.count;
 
-        char** trim_file_vars = malloc(sizeof(char*)*max_original_file_vars_matches);
+        char** trim_file_vars = ArenaAlloc(arena, sizeof(char*)*max_original_file_vars_matches);
         for (int index = 0; index < max_original_file_vars_matches; index++) {
             char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
             // Remove `}}` from the string.
@@ -650,6 +704,7 @@ static HTTPGETRequest HTTP_ParseGETRequest(HTTPRequestInfo* request_info, bool i
 	};
 
 }
+#endif
 
 int HTTP_RunServer(char* server_ip_address, char* server_port) {
 	// Setting up and creating server socket.
@@ -715,11 +770,14 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 		init_result = recv(client_socket, receiving_buffer, receiving_buffer_len, 0);
 		if (init_result > 0) {
+            ScratchBegin(allocator->global_arena);
+
 			printf("[SERVER] Bytes received: %d\n", init_result);
 			printf("[SERVER] Data Received: %s\n", receiving_buffer);
 
 			// Parsing HTTP Requset
             HTTPRequestInfo request_info = { .contains_query_string = false };
+
 			// Getting HTTP request method.
 			int index = 0;
 			for (;receiving_buffer[index] != ' '; index++) {
@@ -732,7 +790,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 				request_info.original_route[route_index] = receiving_buffer[index];
 			}
 
-			request_info.decoded_route = DecodeURL(request_info.original_route);
+			request_info.decoded_route = DecodeURL(allocator->global_arena, request_info.original_route);
 
             // If the decoded_route contains a `?` then the actual route is the text
             // before it.
@@ -747,13 +805,21 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
                 }
             }
 
+            if (request_info.contains_query_string) {
+                request_info.route_to_use = request_info.stripped_route;
+            }
+            else {
+                request_info.route_to_use = request_info.decoded_route;
+
+            }
+
 			// Generating array of header keys and values
 			while (receiving_buffer[index] != '\r' && receiving_buffer[index+1] != '\n') {
 				index++;
 			}
 			index += 2;
 
-			StringArray parsed_header = ParseHeaderIntoKeyValuePairString(receiving_buffer+index);
+			StringArray parsed_header = ParseHeaderIntoKeyValuePairString(allocator->global_arena, receiving_buffer+index);
 
 			while (!(receiving_buffer[index]   == '\r' &&
                      receiving_buffer[index+1] == '\n' &&
@@ -764,7 +830,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			index += 4;
 
-            request_info.request_body = strdup(receiving_buffer+index);
+            request_info.request_body = HTTP_StringDup(allocator->global_arena, receiving_buffer+index);
 
 			bool require_json_response = false;
 			for (int index = 0; index < parsed_header.count; index += 2) {
@@ -781,40 +847,63 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 				}
 			}
 
-			if (!strcmp(request_info.request_method, "POST")) {
-				HTTP_ParsePOSTRequest(&request_info);
-			}
+            /* bool created_new_entry = false; */
+            /* bool successfully_deleted_entry = false; */
+			/* if (!strcmp(request_info.request_method, "POST")) { */
+				/* HTTP_ParsePOSTRequest(&request_info); */
+			/* } */
 
-            if (!strcmp(request_info.request_method, "PUT")) {
-                HTTP_ParsePUTRequest(&request_info, require_json_response);
+            /* if (!strcmp(request_info.request_method, "PUT")) { */
+            /*     created_new_entry = HTTP_ParsePUTRequest(&request_info, require_json_response); */
+            /* } */
+
+            /* if (!strcmp(request_info.request_method, "DELETE")) { */
+            /*     successfully_deleted_entry = HTTP_ParseDELETERequest(&request_info); */
+            /* } */
+            
+
+			/* HTTPGETRequest output = HTTP_ParseGETRequest(&request_info, require_json_response, created_new_entry, successfully_deleted_entry); */
+            /* HTTPResponse output = { .response_body_length = -1 }; */
+            HTTPResponse* output = ArenaAlloc(allocator->global_arena, sizeof(HTTPResponse));
+            output->response_body_length = -1;
+            for (int i = 0; i < global_route_and_json_index+1; i++) {
+                if (!strcmp(request_info.route_to_use, global_route_and_json_array[i].route)) {
+                    if (!strcmp(request_info.request_method, global_route_and_json_array[i].method)) {
+                        global_route_and_json_array[i].response_func(allocator, &request_info, output);
+                    }
+                }
             }
 
-			HTTPGETRequest output = HTTP_ParseGETRequest(&request_info, require_json_response);
-			if (!output.data_to_send_length) {
-				HTTP_Send404Page(client_socket, request_info.decoded_route);
+            
+			if (output->response_body_length == -1 || output->response_body == NULL) {
+				HTTP_Send404Page(client_socket, request_info.original_route);
 				closesocket(client_socket);
 
-                free(request_info.decoded_route);
-                free(request_info.request_body);
+                ScratchEnd(allocator->global_arena);
 				continue;
 			}
 
-			FreeStringArray(parsed_header.array, parsed_header.count);
+			/* FreeStringArray(parsed_header.array, parsed_header.count); */
 
-			send(client_socket, output.http_response_header, (int)strlen(output.http_response_header), 0);
-			send(client_socket, output.data_to_send, output.data_to_send_length, 0);
+
+            char* http_response_header = HTTP_CreateResponseHeader(allocator, output->status_code, output->headers);
+			send(client_socket, http_response_header, (int)strlen(http_response_header), 0);
+			send(client_socket, output->response_body, output->response_body_length, 0);
 
 			printf("[SERVER] Bytes sent: %d\n", init_send_result);
-			printf("[SERVER] Data sent (HEADER): %s\n", output.http_response_header);
-			printf("[SERVER] Data sent (DATA): %s\n", output.data_to_send);
-			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output.data_to_send));
-			printf("[SERVER] Data sent (Predicted DATA): %d\n", output.data_to_send_length);
+			printf("[SERVER] Data sent (HEADER): %s\n", http_response_header);
+			printf("[SERVER] Data sent (DATA): %s\n", output->response_body);
+			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output->response_body));
+			printf("[SERVER] Data sent (Predicted DATA): %d\n", output->response_body_length);
 
-			free(output.http_response_header);
-			free(output.data_to_send);
+			/* free(http_response_header); */
 
-            free(request_info.decoded_route);
-            free(request_info.request_body);
+			/* free(output.headers); */
+			/* free(output.response_body); */
+
+            /* free(request_info.decoded_route); */
+            /* free(request_info.request_body); */
+            ScratchEnd(allocator->global_arena);
 		}
 		else if (init_result == 0) {
 			printf("[SERVER] Connection gracefully closing...\n");

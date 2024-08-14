@@ -3,7 +3,6 @@
 #define MAX_HTTP_ROUTE_SIZE 512
 #define MAX_HTTP_QUERY_STRING_SIZE MAX_HTTP_ROUTE_SIZE
 #define MAX_HTTP_REQUEST_SIZE 2056
-#define INITIAL_ROUTE_INFO_ARRAY_SIZE 100
 #define INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE 200
 
 typedef struct {
@@ -18,12 +17,11 @@ typedef struct {
 } HTTPGETRequest;
 
 typedef struct {
-	char* route;
-	cJSON* data;
-} HTTPRouteJSON;
-
-typedef struct {
     char original_route[MAX_HTTP_ROUTE_SIZE];
+    // Will point to the string at either stripped_route or 
+    // decoded_route depending upon if the original route contains 
+    // a query string.
+    char* route_to_use;
     // Decoded URI encoding.
     //@Heap Alloc
     char* decoded_route;
@@ -37,25 +35,60 @@ typedef struct {
     bool contains_query_string;
 } HTTPRequestInfo;
 
-global HTTPRouteAndFilePath* route_info_array;
-global int route_info_array_index;
-// This is the number of elements which have been added above
-// INITIAL_ROUTE_INFO_ARRAY_SIZE
-global int num_of_added_elements;
+enum HTTPStatusCode {
+    OK_200,
+    NOT_FOUND_404,
+    CREATED_201,
+    URI_TOO_LONG_414,
+    CONTENT_TOO_LARGE_413
+};
 
-global char** search_dirs;
-global int search_dirs_size;
+global_variable char* HTTP_StatusCodeStrings[] = {
+    "200 OK",
+    "404 Not Found",
+    "201 Created",
+    "414 URI Too Long",
+    "413 Content Too Large"
+};
 
-global HTTPRouteJSON* global_route_and_json_array;
-global int global_route_and_json_index;
-global int global_route_and_json_added_elements;
 
-global char* put_request_default_dir;
+typedef struct {
+    enum HTTPStatusCode status_code;
+    //@Heap Alloc
+    char* headers;
+    //@Heap Alloc
+    char* response_body;
+    int response_body_length;
+    bool enable_templating;
+} HTTPResponse;
 
+
+typedef struct {
+    Arena* global_arena;
+    Arena* scratch_arena;
+} Allocator;
+
+global_variable Allocator* allocator;
+
+typedef struct {
+    char* method;
+	char* route;
+    void (*response_func)(Allocator*, HTTPRequestInfo*, HTTPResponse*);
+	cJSON* data;
+} HTTPRouteJSON;
+
+global_variable HTTPRouteJSON* global_route_and_json_array;
+global_variable int global_route_and_json_index;
+//global_variable int global_route_and_json_added_elements;
+
+global_variable char** search_dirs;
+global_variable int search_dirs_size;
+
+global_variable char* put_request_default_dir;
 
 void HTTP_Initialize(void);
 void HTTP_SetDefaultPUTDirectory(char* default_dir);
-bool HTTP_HandleRoute(char* method, char* route, char* path_to_data);
+bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator*, HTTPRequestInfo*, HTTPResponse*));
 void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
 bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route);
 void HTTP_Send404Page(SOCKET client_socket, char* route);

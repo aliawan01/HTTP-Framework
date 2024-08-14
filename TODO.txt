@@ -1,38 +1,49 @@
+* Arena
+    * Set default size for each chunks
+    ? Make cJSON use the arena for allocation and deallocation.
+
+    * Finish off making StrReplaceSubstringAllOccurance().
+
+    - StrReplaceSubstringFirstOccurance() -> Copy string to scratch_arena,
+      do replacement work there and then copy the final result to the 
+      global_arena and then free the scratch_arena.
+    - FreeStringArray() should just free the scratch_arena as most of the 
+      work should be done there.
+
+
+
 * PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
   * Be able to modify and delete local variables for a route if they exist.
 
-  * Currently working on HTTP_SetDefaultPUTDirectory
-    * Be able to create a new file in the default PUTs directory if we do not
-      have a JSON response. Create the file in the defaults puts directory and
-      then use the `Content-Location` header in the response to specify to the 
-      browser the physical location of the newly created file on the server.
-      Overwrite the existing data of a file if it already exists (if route_exists
-      is true). Then create a new route in global_route_and_json_array where
-      the route is the stripped route and the file attribute in the JSON data will
-      be set to the file we have been given.
+  * Migrate to using a database for storing file paths, and global and local
+    variables for each route.
+  * Use function pointers for routes to allow the user to generate their own 
+    responses.
+  * Provide useful functions to allow the user to do what they want to do when
+    creating a response.
 
-    * Also make so that we check if we have a JSON response before calling
-      the HTTP_ParsePOSTRequest since our POST request will only handle JSON data.
+    - Create a custom allocator for response_func()
+    - Create a function allow the user to make several headers which will
+      automatically be seperated with \r\n.
 
 
-* Get rid of the route_info_array since we can store all of the file paths
-  we need in global_route_and_json_array.
+* Create a new function for HTTP_RedirectRoute();
 
+* Support other HTTP response codes.
  
 * We will need to need to implement local variables for each route in the database
 e.g. DATABASE LAYOUT:
 TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
 
-* Be able to send and receive and store data in json.
 
 - Make it so that we can change the value of variables which only exist on another
   webpage and only send that webpage when the user wants it (in other words don'that
   return the data at the POST request route if it does not match the route it is 
   currently in).
 
-* Make it so that any variables which do not have a definition are automatically
-  removed from data_to_send.
+* Make it so that any variables which do not have a definition in a file 
+  are automatically removed from data_to_send.
 * Allow users to specify what HTTP methods a certain route will allow (e.g. by creating
   a seperate struct for a route).
 
@@ -51,6 +62,6 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
   sure they work on Linux as well.
 
 NOTES:
-* Could probably just separate the query string from the actual route first and then
-  pass them into the GET and POST handler functions seperatley instead of having to
+* Could probably just seperate the query string from the actual route first and then
+  pass them into the GET and POST handler functions seperately instead of having to
   find them manually in each one.

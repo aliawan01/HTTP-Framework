@@ -1,4 +1,5 @@
-#include "global.h"
+#include "util.h"
+#include "http_request.h"
 #include "string_handling.h"
 
 bool IsInteger(char* string) {
@@ -13,9 +14,16 @@ bool IsInteger(char* string) {
 	return is_int;
 }
 
-char* DecodeURL(char* url) {
-    char* decoded_url = malloc(strlen(url)+1);
-    memset(decoded_url, 0, strlen(url)+1);
+char* HTTP_StringDup(Arena* arena, char* source) {
+    char* duplicate = ArenaAlloc(arena, strlen(source)+1);
+    Assert(duplicate != NULL);
+    memcpy(duplicate, source, strlen(source)+1);
+    printf("HTTP_StringDup: %s\n", duplicate);
+    return duplicate;
+}
+
+char* DecodeURL(Arena* arena, char* url) {
+    char* decoded_url = ArenaAlloc(arena, strlen(url)+1);
 
     int url_index = 0;
     int decoded_index = 0;
@@ -124,8 +132,8 @@ char* DecodeURL(char* url) {
     return decoded_url;
 }
 
-StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
-	char** header_key_value_pairs_array = malloc(sizeof(char*)*50);
+StringArray ParseHeaderIntoKeyValuePairString(Arena* arena, char* header_string) {
+	char** header_key_value_pairs_array = ArenaAlloc(arena, sizeof(char*)*50);
 	int header_key_value_pairs_index = 0;
 	int i = 0;
 	int original_i = i;
@@ -137,7 +145,7 @@ StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
 			on_key = true;
 			on_value = false;
 			header_string[i] = 0;
-			PushNewStringToStringArray(header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i);
+			PushNewStringToStringArray(arena, header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i);
 			header_key_value_pairs_index++;
 			header_string[i] = ':';
 			original_i = i+1;
@@ -147,7 +155,7 @@ StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
 			on_key = false;
 			header_string[i] = 0;
 			// +1 because after there is a space after : and before the value.
-			PushNewStringToStringArray(header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i+1);
+			PushNewStringToStringArray(arena, header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i+1);
 			header_key_value_pairs_index++;
 			header_string[i] = '\r';
 			original_i = i+2;
@@ -166,8 +174,8 @@ StringArray ParseHeaderIntoKeyValuePairString(char* header_string) {
 	};
 }
 
-StringArray ParseURIKeyValuePairString(char* uri_string) {
-	char** key_value_pairs_array = malloc(sizeof(char*)*200);
+StringArray ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
+	char** key_value_pairs_array = ArenaAlloc(arena, sizeof(char*)*200);
 	int key_value_array_index = 0;
 	int i = 0;
 	int original_i = i;
@@ -177,7 +185,7 @@ StringArray ParseURIKeyValuePairString(char* uri_string) {
 			char original_char = uri_string[i];
 			uri_string[i] = 0;
 
-			PushNewStringToStringArray(key_value_pairs_array, key_value_array_index, uri_string+original_i);
+			PushNewStringToStringArray(arena, key_value_pairs_array, key_value_array_index, uri_string+original_i);
 
 			uri_string[i] = original_char;
 			original_i = i+1;
@@ -197,13 +205,13 @@ StringArray ParseURIKeyValuePairString(char* uri_string) {
 	};
 }
 
-StringArray StrRegexGetMatches(char* source, char* pattern) {
+StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	int match_length = 0;
 	int match_id = 0;
 	int match_id_offset = 0;
 	char* source_ptr = source;
 
-	char** matches = malloc(sizeof(char*)*100);
+	char** matches = ArenaAlloc(arena, sizeof(char*)*100);
 	int matches_index = 0;
 	while (match_id != -1) {
 		match_id = re_match(pattern, source_ptr, &match_length);
@@ -215,7 +223,7 @@ StringArray StrRegexGetMatches(char* source, char* pattern) {
 			char original_value = source[match_id_offset+match_length];
 			source[match_id_offset+match_length] = 0;
 
-			PushNewStringToStringArray(matches, matches_index, source+match_id_offset);
+			PushNewStringToStringArray(arena, matches, matches_index, source+match_id_offset);
 			matches_index++;
 
 			source[match_id_offset+match_length] = original_value;
@@ -229,13 +237,11 @@ StringArray StrRegexGetMatches(char* source, char* pattern) {
 	};
 }
 
-char* RemoveWhitespaceFrontAndBack(char* string, int front_offset, int back_offset) {
+char* RemoveWhitespaceFrontAndBack(Allocator* allocator, char* string, int front_offset, int back_offset) {
 	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
 	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
 	//		 iteration of the while loop.
-	char* string_copy = malloc(strlen(string)+1);
-	memset(string_copy, 0, strlen(string)+1);
-	strcpy(string_copy, string);
+	char* string_copy = HTTP_StringDup(allocator->scratch_arena, string);
 
 	char* front_ptr = string_copy+front_offset;
 	if (front_ptr[0] == ' ') {
@@ -256,25 +262,40 @@ char* RemoveWhitespaceFrontAndBack(char* string, int front_offset, int back_offs
 		back_ptr--;
 	}
 
-	return string_copy;
+    char* return_string_copy = HTTP_StringDup(allocator->global_arena, string_copy);
+    ArenaFreeAll(allocator->scratch_arena);
+
+	return return_string_copy;
 }
 
-bool StrReplaceSubstringFirstOccurance(char** source, char* substring, char* replace) {
-    char* substring_occurance = strstr(*source, substring);
-    if (substring_occurance == NULL) {
-        return false;
+// TODO: Find a way to make a copy of the source string the scratch_arena, do work to replace
+//       duplicates there and then copy the string to the global_arena and then free the 
+//       scratch_arena.
+char* StrReplaceSubstringAllOccurance(Allocator* allocator, char** source, char* substring, char* replace) {
+    while (true) {
+        char* substring_occurance = strstr(*source, substring);
+        if (substring_occurance == NULL) {
+            break;
+        }
+
+        int64_t size = strlen(*source);
+        if (strlen(replace) > strlen(substring)) {
+            size += (strlen(replace)-strlen(substring))+1;
+        }
+
+        char* copy_string = ArenaAlloc(allocator->scratch_arena, size);
+        strcpy(copy_string, *source);
+
+        substring_occurance = strstr(copy_string, substring);
+        memmove(substring_occurance + strlen(replace),
+                substring_occurance + strlen(substring),
+                strlen(substring_occurance) - strlen(substring)+1);
+            
+        memcpy(substring_occurance, replace, strlen(replace));
     }
 
-    if (strlen(replace) > strlen(substring)) {
-        size_t new_size = strlen(*source) + (strlen(replace)-strlen(substring))+1;
-        *source = realloc(*source, new_size);
-    }
+    char* return_string = HTTP_StringDup(allocator->global_arena, copy_string);
+    ArenaFreeAll(allocator->scratch_arena);
 
-    substring_occurance = strstr(*source, substring);
-    memmove(substring_occurance + strlen(replace),
-            substring_occurance + strlen(substring),
-            strlen(substring_occurance) - strlen(substring)+1);
-        
-    memcpy(substring_occurance, replace, strlen(replace));
-    return true;
+    return return_string;
 }
