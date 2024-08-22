@@ -28,7 +28,7 @@ static enum CreateDirStatus CreateDir(char* file_name);
 
 static enum CreateDirStatus CreateDir(char* file_path) {
     if (file_path != NULL) { 
-        if (!CreateDirectory(file_path, NULL)) {
+        if (!CreateDirectoryA(file_path, NULL)) {
             switch (GetLastError()) {
                 case ERROR_ALREADY_EXISTS:
                     return DIR_ALREADY_EXISTS;

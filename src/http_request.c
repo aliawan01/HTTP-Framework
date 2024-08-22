@@ -4,21 +4,22 @@
 #include "file_handling.h"
 #include <time.h>
 
+
 void HTTP_Initialize(void) {
     // TODO: Perhaps allow the user to specify the size of the global and scratch arena.
-    allocator = malloc(sizeof(Allocator));
-    allocator->global_arena = malloc(sizeof(Arena));
-    allocator->scratch_arena = malloc(sizeof(Arena));
+    ArenaInit(allocator.permanent_arena, MB(200));
+    ArenaInit(allocator.recycle_arena, MB(200));
 
-    ArenaInit(allocator->global_arena, MB(500));
-    ArenaInit(allocator->scratch_arena, MB(50));
+    for (int i = 0; i < ArrayCount(allocator.scratch_pool); i++) {
+        ArenaInit(allocator.scratch_pool[i], MB(50));
+    }
 
-	global_route_and_json_array = ArenaAlloc(allocator->global_arena, sizeof(HTTPRouteJSON)*INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
+	global_route_and_json_array = ArenaAlloc(allocator.permanent_arena, sizeof(HTTPRouteJSON)*INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
 	global_route_and_json_index = -1;
 }
 
 
-bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator* allocator, HTTPRequestInfo*, HTTPResponse*)) {
+bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
 	// Checking if the route is in the correct format.
 	if (route[0] != '/') {
 		printf("[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
@@ -27,7 +28,8 @@ bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator
 
 	// Checking if the route already exists.
 	for (int index = 0; index < global_route_and_json_index+1; index++) {
-		if (!strcmp(global_route_and_json_array[index].route, route)) {
+		if (!strcmp(global_route_and_json_array[index].route, route) &&
+            !strcmp(global_route_and_json_array[index].method, method)) {
 			printf("[WARNING] HTTP_HandleRoute() data for route: %s already exists.\n", route);
 			return false;
 		}
@@ -37,8 +39,8 @@ bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator
     Assert(global_route_and_json_index < INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE);
 
 	global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
-        .method = HTTP_StringDup(allocator->global_arena, method),
-		.route = HTTP_StringDup(allocator->global_arena, route),
+        .method = HTTP_StringDup(allocator.permanent_arena, method),
+		.route = HTTP_StringDup(allocator.permanent_arena, route),
         .response_func = response_func,
         .data = cJSON_CreateObject() 
 	};
@@ -50,10 +52,10 @@ bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator
 
 void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
 	if (dirs != NULL) {
-		search_dirs = ArenaAlloc(allocator->global_arena, sizeof(char*)*dirs_size);
+		search_dirs = ArenaAlloc(allocator.permanent_arena, sizeof(char*)*dirs_size);
 		search_dirs_size = dirs_size;
 		for (int index = 0; index < search_dirs_size; index++) {
-			search_dirs[index] = ArenaAlloc(allocator->global_arena, strlen(dirs[index]));
+			search_dirs[index] = ArenaAlloc(allocator.permanent_arena, strlen(dirs[index]));
 			strcpy(search_dirs[index], dirs[index]);
 		}
 	}
@@ -86,11 +88,11 @@ void HTTP_SetDefaultPUTDirectory(char* default_dir) {
     }
 
     if (valid_path) {
-        put_request_default_dir = ArenaAlloc(allocator->global_arena, strlen(default_dir)+1);
+        put_request_default_dir = ArenaAlloc(allocator.permanent_arena, strlen(default_dir)+1);
         strcpy(put_request_default_dir, default_dir);
     }
     else {
-        put_request_default_dir = ArenaAlloc(allocator->global_arena, 4);
+        put_request_default_dir = ArenaAlloc(allocator.permanent_arena, 4);
         strcpy(put_request_default_dir, "");
     }
 }
@@ -158,14 +160,14 @@ static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type
 
 
 // TODO: Needs to be able to create a new \r\n entry for each header.
-static char* HTTP_CreateResponseHeader(Allocator* allocator, enum HTTPStatusCode status_code, char* headers) {
-	char* http_response_header = ArenaAlloc(allocator->global_arena, 1024);
+static char* HTTP_CreateResponseHeader(Arena* arena, enum HTTPStatusCode status_code, char* headers) {
+	char* http_response_header = ArenaAlloc(arena, 1024);
 	sprintf(http_response_header, "HTTP/1.1 %s\r\n%s\r\n\r\n", HTTP_StatusCodeStrings[status_code], headers);
     
 	return http_response_header;
 }
 
-static char* HTTP_CreateResponseHeaderFromFile(Allocator* allocator, char* path_to_file, bool created_new_entry) {
+static char* HTTP_CreateResponseHeaderFromFile(Arena* arena, char* path_to_file, bool created_new_entry) {
 	// Extracting file type into a separate string.
 	char file_type[24] = {0};
 	HTTP_ExtractFileTypeFromFilePath(path_to_file, file_type);
@@ -228,7 +230,7 @@ static char* HTTP_CreateResponseHeaderFromFile(Allocator* allocator, char* path_
         status_code = 200;
     }
 
-	char* http_response_header = ArenaAlloc(allocator->global_arena, 1024);
+	char* http_response_header = ArenaAlloc(arena, 1024);
 	sprintf(http_response_header, "HTTP/1.1 %d OK\r\nContent-Type: %s\r\n\r\n", status_code, content_type);
 
 	return http_response_header;
@@ -706,9 +708,168 @@ static HTTPGETRequest HTTP_ParseGETRequest(Arena* arena, HTTPRequestInfo* reques
 }
 #endif
 
+static void HTTP_ParsePOSTRequest(Arena* arena, HTTPRequestInfo* request_info) {
+	printf("[POST Request Data] %s\n", request_info->request_body);
+    Temp scratch = GetScratch(&arena, 1);
+
+	StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(scratch.arena, request_info->request_body);
+	char** key_value_pairs_array = request_key_value_pairs_array.array;
+	int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
+
+	bool route_exists = false;
+	int route_index = 0;
+	for (; route_index < global_route_and_json_index+1; route_index++) {
+		if (!strcmp(global_route_and_json_array[route_index].route, request_info->route_to_use)) {
+			route_exists = true;
+			break;
+		}
+	}
+
+	bool found_existing_match = false;
+	if (route_exists && request_info->request_body[0] != 0) {
+		for (int index = 0; index < max_key_value_pairs_array_matches; index += 2) {
+			found_existing_match = false;
+            
+            cJSON* item = NULL;
+            if (IsInteger(key_value_pairs_array[index+1])) {
+                char* endptr;
+                item = cJSON_CreateNumber(strtod(key_value_pairs_array[index+1], &endptr));
+            }
+            else if (!strcmp(key_value_pairs_array[index+1], "true")) {
+                item = cJSON_CreateBool(1);
+            }
+            else if (!strcmp(key_value_pairs_array[index+1], "false")) {
+                item = cJSON_CreateBool(0);
+            }
+            else if (!strcmp(key_value_pairs_array[index+1], "null")) {
+                item = cJSON_CreateNull();
+            }
+            else {
+                char* decoded_string = DecodeURL(scratch.arena, key_value_pairs_array[index+1]);
+                item = cJSON_CreateString(decoded_string);
+            }
+            // TODO: Support arrays?
+
+			cJSON* elem = NULL;
+			cJSON_ArrayForEach(elem, global_route_and_json_array[route_index].data) {
+				if (!strcmp(elem->string, key_value_pairs_array[index])) {
+					found_existing_match = true;
+
+                    item->string = ArenaAlloc(arena, strlen(elem->string)+1);
+                    strcpy(item->string, elem->string);
+                    cJSON_ReplaceItemViaPointer(global_route_and_json_array[route_index].data, elem, item);
+                    elem = item;
+                    break;
+				}
+			}
+
+			if (!found_existing_match) {
+                cJSON_AddItemToObject(global_route_and_json_array[route_index].data, key_value_pairs_array[index], item);
+			}
+		}
+	}
+
+	printf("[POST Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
+
+    DeleteScratch(scratch);
+}
+
+// TODO: Replace allocator with an arena.
+static void TemplateText(Arena* arena, HTTPRequestInfo* request_info, char** source) {
+    Temp scratch = GetScratch(0, 0);
+
+    char* path_to_file_at_route = {0};
+    int file_path_index = 0;
+    bool route_exists = false;
+    for (; file_path_index < global_route_and_json_index+1; file_path_index++) {
+        if (!strcmp(global_route_and_json_array[file_path_index].route, request_info->route_to_use)) {
+            route_exists = true;
+            cJSON* elem = NULL;
+            cJSON_ArrayForEach(elem, global_route_and_json_array[file_path_index].data) {
+                if (!strcmp(elem->string, "file")) {
+                    path_to_file_at_route = elem->valuestring;
+                }
+            }
+            break;
+        }
+    }
+
+    if (request_info->contains_query_string) {
+        // Using regex to extract matching variables from the file contents buffer.
+        StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source, "{{[^}]*}}");
+
+        char** trim_file_vars = ArenaAlloc(scratch.arena, sizeof(char*)*original_file_vars_matches.count);
+        for (int index = 0; index < original_file_vars_matches.count; index++) {
+            char* temp = RemoveWhitespaceFrontAndBack(scratch.arena, original_file_vars_matches.array[index], 2, 2);
+            // Remove `}}` from the string.
+            temp[strlen(temp)-2] = 0;
+            // Remove `{{` from the string.
+            temp += 2;
+            trim_file_vars[index] = temp;
+        }
+
+        // Extracting variables and values into key_value_pairs_array;
+        StringArray request_key_value_pairs = ParseURIKeyValuePairString(scratch.arena, request_info->query_string);
+
+        // Replacing variables in the file contents buffer with their values
+        for (int file_var_index = 0; file_var_index < original_file_vars_matches.count; file_var_index++) {
+            for (int key_index = 0; key_index < request_key_value_pairs.count; key_index += 2) {
+                if (!strcmp(trim_file_vars[file_var_index], request_key_value_pairs.array[key_index])) {
+                    *source = StrReplaceSubstringAllOccurance(arena, *source, original_file_vars_matches.array[file_var_index], request_key_value_pairs.array[key_index+1]);
+                }
+            }
+        }
+
+        TempEnd(scratch);
+    }
+
+    // Checking if any of the variables are defined in global_variable_key_value_pairs_array.
+    // Getting regex again because we do not want to override any of the variables which were
+    // changed by values defined in the route itself.
+    StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source, "{{[^}]*}}");
+
+    char** trim_file_vars = ArenaAlloc(scratch.arena, sizeof(char*)*original_file_vars_matches.count);
+    for (int index = 0; index < original_file_vars_matches.count; index++) {
+        char* temp = RemoveWhitespaceFrontAndBack(scratch.arena, original_file_vars_matches.array[index], 2, 2);
+        // Remove `}}` from the string.
+        temp[strlen(temp)-2] = 0;
+        // Remove `{{` from the string.
+        temp += 2;
+        trim_file_vars[index] = temp;
+    }
+
+
+    if (route_exists) {
+        printf("[GET PROCESSSING]: %s\n", cJSON_Print(global_route_and_json_array[file_path_index].data));
+        bool found_matches = false;
+
+        for (int i = 0; i < original_file_vars_matches.count; i++) {
+            cJSON* elem = NULL;
+            cJSON_ArrayForEach(elem, global_route_and_json_array[file_path_index].data) {
+                if (!strcmp(elem->string, trim_file_vars[i])) {
+                    found_matches = true;
+                    // TODO: VERY DANGEROUS, NEED TO CHECK WHAT DATA IS STORED IN THE OBJECT FIRST!
+                    *source = StrReplaceSubstringAllOccurance(arena, *source, original_file_vars_matches.array[i], elem->valuestring);
+                    printf("Replaced String!!!\n");
+                }
+            }
+        }
+    }
+
+    DeleteScratch(scratch);
+}
+
+void* Arena_cJSONMalloc(size_t size) {
+    return ArenaAlloc(allocator.permanent_arena, size);
+}
+
+void Arena_cJSONFree(void* object) {
+    return;
+}
+
 int HTTP_RunServer(char* server_ip_address, char* server_port) {
 	// Setting up and creating server socket.
-	WSADATA* wsaData;
+	WSADATA wsaData;
 	int init_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (init_result != 0) {
 		printf("[SERVER] WSAStartup() failed: %d\n", init_result);
@@ -755,6 +916,12 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 		printf("[SERVER] Listening on IP Address: %s, and Port Number: %s\n", server_ip_address, server_port);
 	}
 
+    // TODO: This is stupid, remove it immediately once we support databases.
+    //       Since we are never removing any of the data on allocator.permanent_arena
+    //       we just keep on piling up the allocations.
+    cJSON_Hooks cjson_arena_hooks = { Arena_cJSONMalloc, Arena_cJSONFree };
+    cJSON_InitHooks(&cjson_arena_hooks);
+
 	while (true) {
 		SOCKET client_socket = accept(listen_socket, NULL, NULL);
 		if (client_socket == INVALID_SOCKET) {
@@ -770,7 +937,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 		init_result = recv(client_socket, receiving_buffer, receiving_buffer_len, 0);
 		if (init_result > 0) {
-            ScratchBegin(allocator->global_arena);
+            ArenaDealloc(allocator.recycle_arena);
 
 			printf("[SERVER] Bytes received: %d\n", init_result);
 			printf("[SERVER] Data Received: %s\n", receiving_buffer);
@@ -790,7 +957,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 				request_info.original_route[route_index] = receiving_buffer[index];
 			}
 
-			request_info.decoded_route = DecodeURL(allocator->global_arena, request_info.original_route);
+			request_info.decoded_route = DecodeURL(allocator.recycle_arena, request_info.original_route);
 
             // If the decoded_route contains a `?` then the actual route is the text
             // before it.
@@ -819,7 +986,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			}
 			index += 2;
 
-			StringArray parsed_header = ParseHeaderIntoKeyValuePairString(allocator->global_arena, receiving_buffer+index);
+			StringArray parsed_header = ParseHeaderIntoKeyValuePairString(allocator.recycle_arena, receiving_buffer+index);
 
 			while (!(receiving_buffer[index]   == '\r' &&
                      receiving_buffer[index+1] == '\n' &&
@@ -830,7 +997,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			index += 4;
 
-            request_info.request_body = HTTP_StringDup(allocator->global_arena, receiving_buffer+index);
+            request_info.request_body = HTTP_StringDup(allocator.recycle_arena, receiving_buffer+index);
 
 			bool require_json_response = false;
 			for (int index = 0; index < parsed_header.count; index += 2) {
@@ -849,10 +1016,6 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
             /* bool created_new_entry = false; */
             /* bool successfully_deleted_entry = false; */
-			/* if (!strcmp(request_info.request_method, "POST")) { */
-				/* HTTP_ParsePOSTRequest(&request_info); */
-			/* } */
-
             /* if (!strcmp(request_info.request_method, "PUT")) { */
             /*     created_new_entry = HTTP_ParsePUTRequest(&request_info, require_json_response); */
             /* } */
@@ -864,12 +1027,12 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
 			/* HTTPGETRequest output = HTTP_ParseGETRequest(&request_info, require_json_response, created_new_entry, successfully_deleted_entry); */
             /* HTTPResponse output = { .response_body_length = -1 }; */
-            HTTPResponse* output = ArenaAlloc(allocator->global_arena, sizeof(HTTPResponse));
+            HTTPResponse* output = ArenaAlloc(allocator.recycle_arena, sizeof(HTTPResponse));
             output->response_body_length = -1;
             for (int i = 0; i < global_route_and_json_index+1; i++) {
                 if (!strcmp(request_info.route_to_use, global_route_and_json_array[i].route)) {
                     if (!strcmp(request_info.request_method, global_route_and_json_array[i].method)) {
-                        global_route_and_json_array[i].response_func(allocator, &request_info, output);
+                        global_route_and_json_array[i].response_func(allocator.recycle_arena, &request_info, output);
                     }
                 }
             }
@@ -878,15 +1041,25 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			if (output->response_body_length == -1 || output->response_body == NULL) {
 				HTTP_Send404Page(client_socket, request_info.original_route);
 				closesocket(client_socket);
-
-                ScratchEnd(allocator->global_arena);
 				continue;
 			}
 
-			/* FreeStringArray(parsed_header.array, parsed_header.count); */
+
+			if (!strcmp(request_info.request_method, "POST")) {
+				HTTP_ParsePOSTRequest(allocator.permanent_arena, &request_info);
+			}
 
 
-            char* http_response_header = HTTP_CreateResponseHeader(allocator, output->status_code, output->headers);
+            // TODO: Perform some extra checks to make sure that we only template 
+            //       text files.
+            if (output->enable_templating) {
+                printf("Started templating...\n");
+                TemplateText(allocator.recycle_arena, &request_info, &output->response_body);
+                output->response_body_length = strlen(output->response_body);
+            }
+
+
+            char* http_response_header = HTTP_CreateResponseHeader(allocator.recycle_arena, output->status_code, output->headers);
 			send(client_socket, http_response_header, (int)strlen(http_response_header), 0);
 			send(client_socket, output->response_body, output->response_body_length, 0);
 
@@ -895,15 +1068,6 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			printf("[SERVER] Data sent (DATA): %s\n", output->response_body);
 			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output->response_body));
 			printf("[SERVER] Data sent (Predicted DATA): %d\n", output->response_body_length);
-
-			/* free(http_response_header); */
-
-			/* free(output.headers); */
-			/* free(output.response_body); */
-
-            /* free(request_info.decoded_route); */
-            /* free(request_info.request_body); */
-            ScratchEnd(allocator->global_arena);
 		}
 		else if (init_result == 0) {
 			printf("[SERVER] Connection gracefully closing...\n");

@@ -3,13 +3,14 @@
 #include "file_handling.h"
 #include "string_handling.h"
 
-void root_page_handler(Allocator* allocator, HTTPRequestInfo* request_info, HTTPResponse* response) {
+void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
     response->status_code = OK_200;
-    response->headers = HTTP_StringDup(allocator->global_arena, "Content-Type: text/html");
-    response->response_body = HTTP_GetFileContents(allocator->global_arena, "static/first_page.html");
+    response->headers = HTTP_StringDup(arena, "Content-Type: text/html");
+    response->response_body = HTTP_GetFileContents(arena, "static/first_page.html");
     response->response_body_length = HTTP_FindFileSize("static/first_page.html");
-    response->enable_templating = false;
+    response->enable_templating = true;
 }
+
 
 int main(void) {
 	HTTP_Initialize();
@@ -20,6 +21,7 @@ int main(void) {
 
 	/* HTTP_HandleRoute("GET", "/", "static/first_page.html"); */
 	HTTP_HandleRoute("GET", "/", root_page_handler);
+	HTTP_HandleRoute("POST", "/", root_page_handler);
 	/* HTTP_HandleRedirectRoute("GET", "/other main website", "/"); */
 
 	printf("\n");

@@ -1,32 +1,36 @@
-* Arena
-    * Set default size for each chunks
-    ? Make cJSON use the arena for allocation and deallocation.
-
-    * Finish off making StrReplaceSubstringAllOccurance().
-
-    - StrReplaceSubstringFirstOccurance() -> Copy string to scratch_arena,
-      do replacement work there and then copy the final result to the 
-      global_arena and then free the scratch_arena.
-    - FreeStringArray() should just free the scratch_arena as most of the 
-      work should be done there.
-
 
 
 * PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
   * Be able to modify and delete local variables for a route if they exist.
 
-  * Migrate to using a database for storing file paths, and global and local
+  - Migrate to using a database for storing file paths, and global and local
     variables for each route.
-  * Use function pointers for routes to allow the user to generate their own 
+  - Use function pointers for routes to allow the user to generate their own 
     responses.
-  * Provide useful functions to allow the user to do what they want to do when
+  - Provide useful functions to allow the user to do what they want to do when
     creating a response.
 
-    - Create a custom allocator for response_func()
-    - Create a function allow the user to make several headers which will
-      automatically be seperated with \r\n.
+  *** Turn the functionality of the ParsePOSTRequest() into a set of useful
+    methods to allow the user to implement the functionality on their own.
 
+  *** Allow for HTTP_HandleRoute() to accept a list of different methods and 
+    future calls to HTTP_HandleRoute() with the same the methods and routes
+    will override the previous ones.
+
+  * Remove the cjson_arena_hooks immediately after we support databases and
+    that means we probably won't need the permanent_arena either and can return
+    back to just using a global_arena.
+
+  * Create a function allow the user to make several headers which will
+    automatically be seperated with \r\n.
+
+* Arena 
+  * Allocate and deallocate pages as necessary (default page size should be 
+    64MB instead of 4K).
+  * When resetting the current_offset pointer of the arena check if the amount
+    of data we are removing is greater than a page in which case we will deallocate
+    the page.
 
 * Create a new function for HTTP_RedirectRoute();
 

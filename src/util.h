@@ -35,4 +35,14 @@
 
 #endif
 
+typedef struct {
+    Arena* permanent_arena;
+    Arena* recycle_arena;
+    Arena* scratch_pool[2];
+    int scratch_arena_num;
+} Allocator;
 
+// TODO: Maybe? make sure this a global_variable after testing.
+extern Allocator allocator;
+
+#define GetScratch(conflicting_arenas, num) ScratchGetFree(allocator.scratch_pool, allocator.scratch_arena_num, conflicting_arenas, num)

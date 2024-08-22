@@ -62,18 +62,10 @@ typedef struct {
     bool enable_templating;
 } HTTPResponse;
 
-
-typedef struct {
-    Arena* global_arena;
-    Arena* scratch_arena;
-} Allocator;
-
-global_variable Allocator* allocator;
-
 typedef struct {
     char* method;
 	char* route;
-    void (*response_func)(Allocator*, HTTPRequestInfo*, HTTPResponse*);
+    void (*response_func)(Arena*, HTTPRequestInfo*, HTTPResponse*);
 	cJSON* data;
 } HTTPRouteJSON;
 
@@ -88,7 +80,7 @@ global_variable char* put_request_default_dir;
 
 void HTTP_Initialize(void);
 void HTTP_SetDefaultPUTDirectory(char* default_dir);
-bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Allocator*, HTTPRequestInfo*, HTTPResponse*));
+bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Arena*, HTTPRequestInfo*, HTTPResponse*));
 void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
 bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route);
 void HTTP_Send404Page(SOCKET client_socket, char* route);

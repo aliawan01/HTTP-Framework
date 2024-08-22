@@ -1,5 +1,4 @@
 #include "util.h"
-#include "http_request.h"
 #include "string_handling.h"
 
 bool IsInteger(char* string) {
@@ -18,7 +17,6 @@ char* HTTP_StringDup(Arena* arena, char* source) {
     char* duplicate = ArenaAlloc(arena, strlen(source)+1);
     Assert(duplicate != NULL);
     memcpy(duplicate, source, strlen(source)+1);
-    printf("HTTP_StringDup: %s\n", duplicate);
     return duplicate;
 }
 
@@ -237,11 +235,12 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	};
 }
 
-char* RemoveWhitespaceFrontAndBack(Allocator* allocator, char* string, int front_offset, int back_offset) {
+char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset) {
 	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
 	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
 	//		 iteration of the while loop.
-	char* string_copy = HTTP_StringDup(allocator->scratch_arena, string);
+    Temp scratch = GetScratch(&arena, 1);
+	char* string_copy = HTTP_StringDup(scratch.arena, string);
 
 	char* front_ptr = string_copy+front_offset;
 	if (front_ptr[0] == ' ') {
@@ -262,8 +261,8 @@ char* RemoveWhitespaceFrontAndBack(Allocator* allocator, char* string, int front
 		back_ptr--;
 	}
 
-    char* return_string_copy = HTTP_StringDup(allocator->global_arena, string_copy);
-    ArenaFreeAll(allocator->scratch_arena);
+    char* return_string_copy = HTTP_StringDup(arena, string_copy);
+    DeleteScratch(scratch);
 
 	return return_string_copy;
 }
@@ -271,22 +270,23 @@ char* RemoveWhitespaceFrontAndBack(Allocator* allocator, char* string, int front
 // TODO: Find a way to make a copy of the source string the scratch_arena, do work to replace
 //       duplicates there and then copy the string to the global_arena and then free the 
 //       scratch_arena.
-char* StrReplaceSubstringAllOccurance(Allocator* allocator, char** source, char* substring, char* replace) {
+char* StrReplaceSubstringAllOccurance(Arena* arena, char* source, char* substring, char* replace) {
+    Temp scratch = GetScratch(&arena, 1); 
+    char* source_copy = HTTP_StringDup(scratch.arena, source);
+
     while (true) {
-        char* substring_occurance = strstr(*source, substring);
+        char* substring_occurance = strstr(source_copy, substring);
+
         if (substring_occurance == NULL) {
             break;
         }
 
-        int64_t size = strlen(*source);
         if (strlen(replace) > strlen(substring)) {
-            size += (strlen(replace)-strlen(substring))+1;
+            size_t new_size = strlen(source_copy) + (strlen(replace)-strlen(substring))+1;
+            ArenaIncrementOffset(scratch.arena, new_size);
         }
 
-        char* copy_string = ArenaAlloc(allocator->scratch_arena, size);
-        strcpy(copy_string, *source);
-
-        substring_occurance = strstr(copy_string, substring);
+        substring_occurance = strstr(source_copy, substring);
         memmove(substring_occurance + strlen(replace),
                 substring_occurance + strlen(substring),
                 strlen(substring_occurance) - strlen(substring)+1);
@@ -294,8 +294,7 @@ char* StrReplaceSubstringAllOccurance(Allocator* allocator, char** source, char*
         memcpy(substring_occurance, replace, strlen(replace));
     }
 
-    char* return_string = HTTP_StringDup(allocator->global_arena, copy_string);
-    ArenaFreeAll(allocator->scratch_arena);
-
-    return return_string;
+    char* return_source_copy = HTTP_StringDup(arena, source_copy);
+    DeleteScratch(scratch);
+    return return_source_copy;
 }
