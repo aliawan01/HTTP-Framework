@@ -1,16 +1,21 @@
 #pragma once
+
+#include "string_handling.h"
+
 #define MAX_HTTP_REQUEST_METHOD_SIZE 20
 #define MAX_HTTP_ROUTE_SIZE 512
 #define MAX_HTTP_QUERY_STRING_SIZE MAX_HTTP_ROUTE_SIZE
 #define MAX_HTTP_REQUEST_SIZE 2056
-#define INITIAL_GLOBAL_ROUTE_AND_JSON_ARRAY_SIZE 200
+#define INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE 1000
+
+typedef Dict HeaderDict;
 
 typedef struct {
 	char* route;
 	char* path_to_file;
 } HTTPRouteAndFilePath;
 
-typedef struct {
+typedef struct HTTPGetRequest {
 	char* http_response_header;
 	char* data_to_send;
 	int data_to_send_length;
@@ -23,15 +28,18 @@ typedef struct {
     // a query string.
     char* route_to_use;
     // Decoded URI encoding.
-    //@Heap Alloc
     char* decoded_route;
     // Stripped away the query string.
     char stripped_route[MAX_HTTP_ROUTE_SIZE];
     char request_method[MAX_HTTP_REQUEST_METHOD_SIZE];
     char query_string[MAX_HTTP_QUERY_STRING_SIZE];
-    //@Heap Alloc
-    char* request_body;
-    char content_type[128];
+    union {
+        char* request_body;
+        cJSON* json_request_body;
+    };
+
+    HeaderDict headers;
+    bool is_json_request;
     bool contains_query_string;
 } HTTPRequestInfo;
 
@@ -51,37 +59,35 @@ global_variable char* HTTP_StatusCodeStrings[] = {
     "413 Content Too Large"
 };
 
-
 typedef struct {
     enum HTTPStatusCode status_code;
-    //@Heap Alloc
-    char* headers;
-    //@Heap Alloc
+    HeaderDict headers;
     char* response_body;
     int response_body_length;
-    bool enable_templating;
 } HTTPResponse;
 
 typedef struct {
     char* method;
 	char* route;
+    bool is_regex_route;
     void (*response_func)(Arena*, HTTPRequestInfo*, HTTPResponse*);
-	cJSON* data;
-} HTTPRouteJSON;
+} HTTPRouteCallback;
 
-global_variable HTTPRouteJSON* global_route_and_json_array;
-global_variable int global_route_and_json_index;
-//global_variable int global_route_and_json_added_elements;
+/* global_variable HTTPRouteCallback* global_route_callback_array; */
+/* global_variable int global_route_callback_index; */
+HTTPRouteCallback* global_route_callback_array;
+int global_route_callback_index;
 
 global_variable char** search_dirs;
 global_variable int search_dirs_size;
 
-global_variable char* put_request_default_dir;
-
-void HTTP_Initialize(void);
-void HTTP_SetDefaultPUTDirectory(char* default_dir);
-bool HTTP_HandleRoute(char* method, char* route, void (*response_func)(Arena*, HTTPRequestInfo*, HTTPResponse*));
-void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
-bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route);
-void HTTP_Send404Page(SOCKET client_socket, char* route);
-int HTTP_RunServer(char* server_ip_address, char* server_port);
+void  HTTP_Initialize(void);
+bool  HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
+bool  HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
+bool  HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
+void  HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
+void  HTTP_Send404Page(SOCKET client_socket, char* route);
+int   HTTP_RunServer(char* server_ip_address, char* server_port);
+void  HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
+void  HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char** source);
+char* HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);

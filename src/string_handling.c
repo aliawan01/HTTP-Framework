@@ -3,25 +3,33 @@
 
 bool IsInteger(char* string) {
 	bool is_int = true;
+    int decimal_point_occurances = 0;
 	for (int i = 0; i < strlen(string); i++) {
-		if (string[i] < 48 || string[i] > 57) {
+        if (string[i] == '.') {
+            decimal_point_occurances++;
+        }
+        else if (string[i] < 48 || string[i] > 57) {
 			is_int = false;
 			break;
 		}
 	}
 
+    if (decimal_point_occurances > 1) {
+        is_int = false;
+    }
+
 	return is_int;
 }
 
 char* HTTP_StringDup(Arena* arena, char* source) {
-    char* duplicate = ArenaAlloc(arena, strlen(source)+1);
+    char* duplicate = PushString(arena, strlen(source)+1);
     Assert(duplicate != NULL);
     memcpy(duplicate, source, strlen(source)+1);
     return duplicate;
 }
 
 char* DecodeURL(Arena* arena, char* url) {
-    char* decoded_url = ArenaAlloc(arena, strlen(url)+1);
+    char* decoded_url = PushString(arena, strlen(url)+1);
 
     int url_index = 0;
     int decoded_index = 0;
@@ -130,9 +138,11 @@ char* DecodeURL(Arena* arena, char* url) {
     return decoded_url;
 }
 
-StringArray ParseHeaderIntoKeyValuePairString(Arena* arena, char* header_string) {
-	char** header_key_value_pairs_array = ArenaAlloc(arena, sizeof(char*)*50);
-	int header_key_value_pairs_index = 0;
+Dict ParseHeaderIntoDict(Arena* arena, char* header_string) {
+	char** header_key_array = PushArray(arena, char*, 50);
+	char** header_value_array = PushArray(arena, char*, 50);
+	int header_dict_index = 0;
+
 	int i = 0;
 	int original_i = i;
 
@@ -143,8 +153,8 @@ StringArray ParseHeaderIntoKeyValuePairString(Arena* arena, char* header_string)
 			on_key = true;
 			on_value = false;
 			header_string[i] = 0;
-			PushNewStringToStringArray(arena, header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i);
-			header_key_value_pairs_index++;
+			PushNewStringToDict(arena, header_key_array, header_dict_index, header_string+original_i);
+			/* header_dict_index++; */
 			header_string[i] = ':';
 			original_i = i+1;
 		}
@@ -153,8 +163,8 @@ StringArray ParseHeaderIntoKeyValuePairString(Arena* arena, char* header_string)
 			on_key = false;
 			header_string[i] = 0;
 			// +1 because after there is a space after : and before the value.
-			PushNewStringToStringArray(arena, header_key_value_pairs_array, header_key_value_pairs_index, header_string+original_i+1);
-			header_key_value_pairs_index++;
+			PushNewStringToDict(arena, header_value_array, header_dict_index, header_string+original_i+1);
+			header_dict_index++;
 			header_string[i] = '\r';
 			original_i = i+2;
 			i++;
@@ -166,28 +176,40 @@ StringArray ParseHeaderIntoKeyValuePairString(Arena* arena, char* header_string)
 		}
 	}
 
-	return (StringArray) {
-		.array = header_key_value_pairs_array,
-		.count = header_key_value_pairs_index 
+	return (Dict) {
+		.keys = header_key_array,
+        .values = header_value_array,
+		.count = header_dict_index 
 	};
 }
 
-StringArray ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
-	char** key_value_pairs_array = ArenaAlloc(arena, sizeof(char*)*200);
-	int key_value_array_index = 0;
+Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
+	char** key_array = PushArray(arena, char*, 200);
+	char** value_array = PushArray(arena, char*, 200);
+	int dict_index = 0;
+
 	int i = 0;
 	int original_i = i;
 
+    bool on_key = true;
 	while (true) {
 		if (uri_string[i] == '=' || uri_string[i] == '&' || !uri_string[i]) {
 			char original_char = uri_string[i];
 			uri_string[i] = 0;
 
-			PushNewStringToStringArray(arena, key_value_pairs_array, key_value_array_index, uri_string+original_i);
+            if (on_key) {
+                on_key = false;
+                PushNewStringToDict(arena, key_array, dict_index, uri_string+original_i);
+            }
+            else {
+                on_key = true;
+                PushNewStringToDict(arena, value_array, dict_index, uri_string+original_i);
+                dict_index++;
+            }
 
 			uri_string[i] = original_char;
 			original_i = i+1;
-			key_value_array_index += 1;
+			/* key_value_array_index += 1; */
 			// Hit null terminator
 			if (uri_string[i] == 0) {
 				break;
@@ -197,9 +219,10 @@ StringArray ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
 		i++;
 	}
 
-	return (StringArray) {
-		.array = key_value_pairs_array,
-		.count = key_value_array_index
+	return (Dict) {
+		.keys = key_array,
+		.values = value_array,
+		.count = dict_index 
 	};
 }
 
@@ -209,7 +232,7 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	int match_id_offset = 0;
 	char* source_ptr = source;
 
-	char** matches = ArenaAlloc(arena, sizeof(char*)*100);
+	char** matches = PushArray(arena, char*, 100);
 	int matches_index = 0;
 	while (match_id != -1) {
 		match_id = re_match(pattern, source_ptr, &match_length);

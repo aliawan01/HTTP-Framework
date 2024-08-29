@@ -1,16 +1,14 @@
-#ifndef PLATFORM_H
-#define PLATFORM_H
+#pragma once
 
-enum CreateDirStatus {
-    SUCCESS,
-    DIR_ALREADY_EXISTS,
-    PATH_NOT_FOUND,
-    GIVEN_INVALID_FILE_PATH,
-    OTHER_ERROR
-};
-
-// Platform Specific Functions
-static enum CreateDirStatus CreateDir(char* file_name);
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdalign.h>
+#include <string.h>
+#include <re.h>
+#include <sqlite3.h>
+#include <cJSON.h>
 
 #ifdef _WIN32 
 
@@ -25,63 +23,19 @@ static enum CreateDirStatus CreateDir(char* file_name);
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
-
-static enum CreateDirStatus CreateDir(char* file_path) {
-    if (file_path != NULL) { 
-        if (!CreateDirectoryA(file_path, NULL)) {
-            switch (GetLastError()) {
-                case ERROR_ALREADY_EXISTS:
-                    return DIR_ALREADY_EXISTS;
-                    break;
-                case ERROR_PATH_NOT_FOUND:
-                    return PATH_NOT_FOUND;
-                    break;
-                default:
-                    return OTHER_ERROR;
-            }
-        }
-        else {
-            return SUCCESS;
-        }
-    }
-    else {
-        return GIVEN_INVALID_FILE_PATH;
-    }
-}
-
-
-#else 
-
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <errno.h>
-
-static enum CreateDirStatus CreateDir(char* file_path) {
-    if (default_dir != NULL) {
-        if (mkdir(default_dir, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
-            switch (errno) {
-                case EEXIST:
-                    return DIR_ALREADY_EXISTS;
-                    break;
-                case ENOENT: 
-                    return PATH_NOT_FOUND;
-                default:
-                    return OTHER_ERROR;
-            }
-
-        }
-        else {
-            return SUCCESS;
-        }
-
-    }
-    else {
-        return GIVEN_INVALID_FILE_PATH;
-    }
-}
-
+#include <shellapi.h>
 
 #endif
 
+enum HTTPCreateDirStatus {
+    SUCCESS,
+    DIR_ALREADY_EXISTS,
+    PATH_NOT_FOUND,
+    GIVEN_INVALID_FILE_PATH,
+    OTHER_ERROR
+};
 
-#endif
+// Platform Specific Functions
+enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path);
+bool HTTP_DeleteDirRecursive(char* dir_name);
+

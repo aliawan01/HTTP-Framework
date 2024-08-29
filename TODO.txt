@@ -1,8 +1,5 @@
-
-
 * PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
-  * Be able to modify and delete local variables for a route if they exist.
 
   - Migrate to using a database for storing file paths, and global and local
     variables for each route.
@@ -11,19 +8,35 @@
   - Provide useful functions to allow the user to do what they want to do when
     creating a response.
 
-  *** Turn the functionality of the ParsePOSTRequest() into a set of useful
+  * Turn the functionality of the ParsePOSTRequest() into a set of useful
     methods to allow the user to implement the functionality on their own.
+    - See if we have some more features to add.
 
-  *** Allow for HTTP_HandleRoute() to accept a list of different methods and 
-    future calls to HTTP_HandleRoute() with the same the methods and routes
-    will override the previous ones.
+  *** Add cookies.
 
-  * Remove the cjson_arena_hooks immediately after we support databases and
+  ** Create some wrapper functions around cJSON for extra JSON functionality 
+      the user may need (e.g. like the code in the sql callback functions to find 
+      the type of a variable before adding it into the cJSON object).
+      - Add function for type checking a value when making a cJSON object in
+        cjson_helper.c
+
+  ** Maybe add redirect routes inside callback functions it will just find an existing
+      route entry the global_route_callback_array and if there is one if it will call their
+      callback function.
+
+  - Make an example REST API.
+
+  - Remove the cjson_arena_hooks immediately after we support databases and
     that means we probably won't need the permanent_arena either and can return
     back to just using a global_arena.
 
-  * Create a function allow the user to make several headers which will
-    automatically be seperated with \r\n.
+  - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()
+    functions from files which are text file (images and videos should not be allowed
+    to be templated).
+
+  - Start to integrate a database to allow the user to manage the json information
+    themselves.
+
 
 * Arena 
   * Allocate and deallocate pages as necessary (default page size should be 
@@ -52,6 +65,7 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
   a seperate struct for a route).
 
 * Support parsing lists in json.
+* Add cookies
 
 - Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
   data will be sent) -> this will need multithreading to handle multiple clients.

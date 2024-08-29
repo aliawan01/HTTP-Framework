@@ -3,11 +3,16 @@
   <head>
     <!-- <script> -->
     <!--   async function getData() { -->
-    <!--       const response = await fetch("/new_route?pname=This work!!!", { -->
-    <!--           method: "DELETE", -->
+    <!--       const response = await fetch("/", { -->
+    <!--           method: "POST", -->
     <!--           headers: { -->
-    <!--               'Content-Type': 'text/html' -->
+    <!--               'Content-Type': 'application/json' -->
     <!--           }, -->
+    <!--           body: JSON.stringify({ -->
+    <!--               'fname': 'oOga', -->
+    <!--               'lname': 'Booga', -->
+    <!--               'pname': 'Doal' -->
+    <!--           }) -->
     <!--           // body: "<html><h1>New File is not craeted by the getData() function</h1><p>Trying to occupy some IT WAS CHANGED!!!</p></html>" -->
     <!--       }).then(response => { -->
     <!--           console.log("Initial Response:", response); -->
@@ -45,5 +50,6 @@
 {{ custom }}
 {{ name }}
 {{ surname }}
+
   </body>
 </html>
