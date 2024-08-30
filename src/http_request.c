@@ -817,12 +817,13 @@ static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_bo
     DeleteScratch(scratch);
 }
 
-void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char** source) {
+void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source) {
     Temp scratch = GetScratch(0, 0);
+    char** source_string = &source->string;
 
     if (request_info->contains_query_string) {
         // Using regex to extract matching variables from the file contents buffer.
-        StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source, "{{[^}]*}}");
+        StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source_string, "{{[^}]*}}");
 
         char** trim_file_vars = PushArray(scratch.arena, char*, original_file_vars_matches.count);
         for (int index = 0; index < original_file_vars_matches.count; index++) {
@@ -841,7 +842,7 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
         for (int file_var_index = 0; file_var_index < original_file_vars_matches.count; file_var_index++) {
             for (int key_index = 0; key_index < request_key_value_dict.count; key_index ++) {
                 if (!strcmp(trim_file_vars[file_var_index], request_key_value_dict.keys[key_index])) {
-                    *source = StrReplaceSubstringAllOccurance(arena, *source, original_file_vars_matches.array[file_var_index], request_key_value_dict.values[key_index]);
+                    *source_string = StrReplaceSubstringAllOccurance(arena, *source_string, original_file_vars_matches.array[file_var_index], request_key_value_dict.values[key_index]);
                 }
             }
         }
@@ -852,7 +853,7 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
     // Checking if any of the variables are defined in global_variable_key_value_pairs_array.
     // Getting regex again because we do not want to override any of the variables which were
     // changed by values defined in the route itself.
-    StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source, "{{[^}]*}}");
+    StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source_string, "{{[^}]*}}");
 
     char** trim_file_vars = PushArray(scratch.arena, char*, original_file_vars_matches.count);
     for (int index = 0; index < original_file_vars_matches.count; index++) {
@@ -866,25 +867,38 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
 
     if (variables != NULL) {
         printf("[GET PROCESSSING]: %s\n", cJSON_Print(variables));
-        bool found_matches = false;
 
         for (int i = 0; i < original_file_vars_matches.count; i++) {
             cJSON* elem = NULL;
             cJSON_ArrayForEach(elem, variables) {
                 if (!strcmp(elem->string, trim_file_vars[i])) {
-                    found_matches = true;
-                    // TODO: VERY DANGEROUS, NEED TO CHECK WHAT DATA IS STORED IN THE OBJECT FIRST!
-                    *source = StrReplaceSubstringAllOccurance(arena, *source, original_file_vars_matches.array[i], elem->valuestring);
+                    char string_buf[256] = {0};
+                    char* string_val = cJSON_GetStringValue(elem);
+
+                    if (string_val == NULL) {
+                        double float_val = cJSON_GetNumberValue(elem);
+                        if (float_val - (int)float_val == 0) {
+                            sprintf(string_buf, "%d", (int)float_val);
+                        }
+                        else {
+                            sprintf(string_buf, "%f", float_val);
+                        }
+
+                    }
+
+                    *source_string = StrReplaceSubstringAllOccurance(arena, *source_string, original_file_vars_matches.array[i], string_val == NULL ? string_buf : string_val);
                 }
             }
         }
     }
 
+    source->count = strlen(*source_string);
+
     DeleteScratch(scratch);
 }
 
-char* HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path)  {
-    char* file_contents = HTTP_GetFileContents(arena, file_path);
+String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path)  {
+    String file_contents = HTTP_GetFileContents(arena, file_path);
     HTTP_TemplateText(arena, request_info, variables, &file_contents);
     return file_contents;
 }
@@ -1083,7 +1097,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
             output.headers.keys = PushArray(allocator.recycle_arena, char*, 50);
             output.headers.values = PushArray(allocator.recycle_arena, char*, 50);
 
-            output.response_body_length = -1;
+            output.response_body.count = -1;
 
             int match_id = 0;
             int match_length = 0;
@@ -1113,27 +1127,27 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
             
             bool invalid_response = false;
-			if (output.response_body_length == -1 || output.response_body == NULL) {
-				/* HTTP_Send404Page(client_socket, request_info.original_route); */
-				/* closesocket(client_socket); */
-				/* continue; */
+			if (output.response_body.count == -1 || output.response_body.string == NULL) {
                 invalid_response = true;
 			}
 
-            bool contains_content_type_header = false;
-			for (int index = 0; index < output.headers.count; index++) {
-				if (!strcmp(output.headers.keys[index], "Content-Type")) {
-                    contains_content_type_header = true;
-				}
-			}
+            if (!invalid_response) {
+                bool contains_content_type_header = false;
 
-            if (!contains_content_type_header) {
-                printf("[SERVER] No `Content-Type` header specified for response at route `%s`, sending 404 page.\n", request_info.route_to_use);
-                invalid_response = true;
-                /* HTTP_Send404Page(client_socket, request_info.original_route); */
-                /* closesocket(client_socket); */
-                /* continue; */
+                for (int index = 0; index < output.headers.count; index++) {
+                    if (!strcmp(output.headers.keys[index], "Content-Type")) {
+                        contains_content_type_header = true;
+                    }
+                }
+
+                if (!contains_content_type_header) {
+                    printf("[SERVER] No `Content-Type` header specified for response at route `%s`, sending 404 page.\n", request_info.route_to_use);
+                    HTTP_Send404Page(client_socket, request_info.original_route);
+                    closesocket(client_socket);
+                    continue;
+                }
             }
+
 
             if (invalid_response) {
                 // Checking if the route can be mapped to a path to an existing file.
@@ -1153,8 +1167,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
                             sprintf(file_path, "%s%s", search_dirs[i], request_info.route_to_use+1);
                         }
 
-                        output.response_body_length = HTTP_FindFileSize(file_path);
-                        if (output.response_body_length != -1) {
+                        if (HTTP_FileExists(file_path)) {
                             output.response_body = HTTP_GetFileContents(allocator.recycle_arena, file_path);
                             HTTP_ConvertFileExtensionToContentType(content_type, file_type);
                             HTTP_AddHeaderToHeaderDict(allocator.recycle_arena, &output.headers, "Content-Type", content_type);
@@ -1175,13 +1188,13 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 
             char* http_response_header = HTTP_CreateResponseHeader(allocator.recycle_arena, output.status_code, &output.headers);
 			send(client_socket, http_response_header, (int)strlen(http_response_header), 0);
-			send(client_socket, output.response_body, output.response_body_length, 0);
+			send(client_socket, output.response_body.string, output.response_body.count, 0);
 
 			printf("[SERVER] Bytes sent: %d\n", init_send_result);
 			printf("[SERVER] Data sent (HEADER): %s\n", http_response_header);
-			printf("[SERVER] Data sent (DATA): %s\n", output.response_body);
-			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output.response_body));
-			printf("[SERVER] Data sent (Predicted DATA): %d\n", output.response_body_length);
+			printf("[SERVER] Data sent (DATA): %s\n", output.response_body.string);
+			printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output.response_body.string));
+			printf("[SERVER] Data sent (Predicted DATA): %lld\n", output.response_body.count);
 		}
 		else if (init_result == 0) {
 			printf("[SERVER] Connection gracefully closing...\n");

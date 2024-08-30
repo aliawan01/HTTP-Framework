@@ -24,7 +24,6 @@
       route entry the global_route_callback_array and if there is one if it will call their
       callback function.
 
-  - Make an example REST API.
 
   - Remove the cjson_arena_hooks immediately after we support databases and
     that means we probably won't need the permanent_arena either and can return
@@ -33,10 +32,14 @@
   - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()
     functions from files which are text file (images and videos should not be allowed
     to be templated).
+    - Could check if `file_contents.count == strlen(file_contents.string)` in 
+      HTTP_GetFileContents() if it is then we know it is probably a text file
+      otherwise it will probably be a video or an image.
 
   - Start to integrate a database to allow the user to manage the json information
     themselves.
 
+  - Make an example REST API.
 
 * Arena 
   * Allocate and deallocate pages as necessary (default page size should be 

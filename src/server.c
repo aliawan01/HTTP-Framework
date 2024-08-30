@@ -9,8 +9,7 @@ void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPRespon
     response->status_code = OK_200;
 
     HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", "text/html");
-    response->response_body = "<h1>Recieved it</h1><p>Trying to fillout some space</p>";
-    response->response_body_length = strlen("<h1>Recieved it</h1><p>Trying to fillout some space</p>");
+    response->response_body = HTTP_StrLit("<h1>Recieved it</h1><p>Trying to fillout some space</p>");
 }
 
 void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
@@ -24,8 +23,10 @@ void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse
 
     cJSON* result = HTTP_RunSQLQuery("SELECT DISTINCT fname, lname, pname FROM Info", false);
     HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", "text/html");
+    /* HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Set-Cookie", "name=John"); */
+    /* HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Set-Cookie", "surname=Cena"); */
     response->response_body = HTTP_TemplateTextFromFile(arena, request_info, result, "static/first_page.html");
-    response->response_body_length = strlen(response->response_body);
+
     HTTP_HandleRoute("GET", "/ooga", false, second_page_handler);
 }
 

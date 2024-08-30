@@ -36,26 +36,33 @@ int64_t HTTP_FindFileSize(char *file_name) {
 	}
 
 	fseek(file, 0, SEEK_END);
-	int64_t file_size = ftell(file);
+	int64_t file_size = ftell(file)+1;
 	fclose(file);
 	return file_size;
 }
 
-char* HTTP_GetFileContents(Arena* arena, char* file_name) {
+String HTTP_GetFileContents(Arena* arena, char* file_name) {
+    String file_contents = {0};
+
 	FILE* file = fopen(file_name, "rb");
 	if (file == NULL) {
 		printf("GetFileContents(): Error couldn't open the file %s\n", file_name);
-		return NULL;
+		return file_contents;
 	}
 
 	fseek(file, 0, SEEK_END);
-	int64_t file_size = ftell(file);
+	file_contents.count = ftell(file);
 	fseek(file, 0, SEEK_SET);
 
-	char* file_contents = PushString(arena, file_size+1);
+	file_contents.string = PushString(arena, file_contents.count+1);
 
-	fread(file_contents, sizeof(char), file_size, file);
+	fread(file_contents.string, sizeof(char), file_contents.count+1, file);
 	fclose(file);
+
+    printf("Inside HTTP_GetFileContents(%s)\n", file_name);
+    printf("\tStrlen(): %lld\n", strlen(file_contents.string));
+    printf("\tHTTP_FindFileSize(): %lld\n", file_contents.count);
+
 	return file_contents;
 }
 

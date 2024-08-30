@@ -32,6 +32,14 @@ static bool IsPowerOfTwo(uint64_t num) {
 }
 
 typedef struct {
+    char* string;
+    uint64_t count;
+} String;
+
+#define StrLit(string) (String) {(char*)string, sizeof(string)-1}
+#define HTTP_StrLit(string) StrLit(string)
+
+typedef struct {
     Arena* permanent_arena;
     Arena* route_callback_arena;
     Arena* recycle_arena;
