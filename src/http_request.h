@@ -9,11 +9,7 @@
 #define INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE 1000
 
 typedef Dict HeaderDict;
-
-typedef struct {
-	char* route;
-	char* path_to_file;
-} HTTPRouteAndFilePath;
+typedef Dict CookiesDict;
 
 typedef struct HTTPGetRequest {
 	char* http_response_header;
@@ -39,6 +35,7 @@ typedef struct {
     };
 
     HeaderDict headers;
+    CookiesDict cookies;
     bool is_json_request;
     bool contains_query_string;
 } HTTPRequestInfo;
@@ -60,8 +57,25 @@ global_variable char* HTTP_StatusCodeStrings[] = {
 };
 
 typedef struct {
+    char*    key;
+    char*    value;
+    int64_t  max_age;
+    char*    expires;
+    char*    path;
+    char*    domain;
+    bool     secure;
+    bool     http_only;
+} Cookie;
+
+typedef struct {
+    Cookie* cookies;
+    int count;
+} CookieJar;
+
+typedef struct {
     enum HTTPStatusCode status_code;
     HeaderDict headers;
+    CookieJar cookie_jar;
     String response_body;
 } HTTPResponse;
 
@@ -86,5 +100,7 @@ void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
 void   HTTP_Send404Page(SOCKET client_socket, char* route);
 int    HTTP_RunServer(char* server_ip_address, char* server_port);
 void   HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
+void   HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
 void   HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
 String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);
+char*  HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);

@@ -52,7 +52,16 @@ bool HTTP_DeleteDirRecursive(char* dir_name) {
     return success;
 }
 
+void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count) {
+    Assert(buffer_count > 257);
 
+    int random_num;
+    for (int i = 0; i < 256; i += 4) {
+        rand_s(&random_num);
+        snprintf(buffer+i, 5, "%d", abs(random_num));
+    }
+
+}
 
 #else 
 

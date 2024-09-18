@@ -2,16 +2,13 @@
 #include "string_handling.h"
 #include "http_request.h"
 #include "file_handling.h"
-#include <stdbool.h>
-#include <time.h>
-
+#include "authentication.h"
 
 void HTTP_Initialize(void) {
     // TODO: Perhaps allow the user to specify the size of the global and scratch arena.
     ArenaInit(allocator.permanent_arena, MB(100));
     ArenaInit(allocator.recycle_arena, MB(100));
     ArenaInit(allocator.route_callback_arena, MB(100));
-
 
     for (int i = 0; i < ArrayCount(allocator.scratch_pool); i++) {
         ArenaInit(allocator.scratch_pool[i], MB(50));
@@ -22,7 +19,7 @@ void HTTP_Initialize(void) {
 }
 
 
-bool  HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
+bool HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
 	// Checking if the route is in the correct format.
 	if (route[0] != '/') {
 		printf("[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
@@ -42,8 +39,8 @@ bool  HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*re
     Assert(global_route_callback_index < INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE);
 
 	global_route_callback_array[global_route_callback_index] = (HTTPRouteCallback) {
-        .method = HTTP_StringDup(allocator.permanent_arena, method),
-		.route = HTTP_StringDup(allocator.permanent_arena, route),
+        .method = strdup(method),
+		.route = strdup(route),
         .is_regex_route = is_regex_route,
         .response_func = response_func,
 	};
@@ -74,6 +71,9 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
             else {
                 printf("[INFO] HTTP_DeleteRouteAllMethod() Deleted route for: `%s` with method: `%s`, contains regex: %d at index: %d\n", route, global_route_callback_array[i].method, is_regex_route, i);
             }
+
+            free(global_route_callback_array[i].route);
+            free(global_route_callback_array[i].method);
 
             // Checking if there was only 1 element in global_route_callback_array.
             if (global_route_callback_index == 0) {
@@ -222,14 +222,151 @@ static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type
 }
 
 
-// TODO: Needs to be able to create a new \r\n entry for each header.
-static char* HTTP_CreateResponseHeader(Arena* arena, enum HTTPStatusCode status_code, HeaderDict* headers) {
-	char* http_response_header = PushString(arena, 1024);
+char* HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second) {
+    char* valid_day_names[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    char* valid_month[]     = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    if (day_name.count != 3) {
+        printf("[ERROR] HTTP_CreateDateString() day_name needs to be a 3 character string, currently it is %lld characters.\n", day_name.count);
+        return NULL;
+    }
+
+    if (month.count != 3) {
+        printf("[ERROR] HTTP_CreateDateString() month needs to be a 3 character string, currently it is %lld characters.\n", month.count);
+        return NULL;
+    }
+
+    bool is_valid_day_name = false;
+    for (int i = 0; i < ArrayCount(valid_day_names); i++) {
+        if (!strcmp(day_name.string, valid_day_names[i])) {
+            is_valid_day_name = true;
+            break;
+        }
+    }
+
+    if (!is_valid_day_name) {
+        printf("[ERROR] HTTP_CreateDateString() day_name's current string `%s` is incorrect, it must be one of the following `Mon, Tue, Wed, Thu, Fri, Sat, Sun`.\n", day_name.string);
+        return NULL;
+    }
+
+
+    bool is_valid_month = false;
+    for (int i = 0; i < ArrayCount(valid_month); i++) {
+        if (!strcmp(month.string, valid_month[i])) {
+            is_valid_month = true;
+            break;
+        }
+    }
+
+    if (!is_valid_month) {
+        printf("[ERROR] HTTP_CreateDateString() month's current string `%s` is incorrect, it must be one of the following `Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec`.\n", month.string);
+        return NULL;
+    }
+
+    if (year > 9999 || year < 0) {
+        printf("[ERROR] HTTP_CreateDateString() year's current value `%d` is incorrect, it must be in the range 0-9999.\n", year);
+        return NULL;
+    }
+
+    if (day_num < 1 || day_num > 31) {
+        printf("[ERROR] HTTP_CreateDateString() day's current value `%d` is incorrect, it must be in the range 1-31.\n", day_num);
+        return NULL;
+    }
+
+    if (hour < 0 || hour > 23) {
+        printf("[ERROR] HTTP_CreateDateString() hour's current value `%d` is incorrect, it must be in the range 0-23.\n", hour);
+        return NULL;
+    }
+
+    if (minute < 0 || minute > 59) {
+        printf("[ERROR] HTTP_CreateDateString() minute's current value `%d` is incorrect, it must be in the range 0-59.\n", minute);
+        return NULL;
+    }
+
+    if (second < 0 || second > 59) {
+        printf("[ERROR] HTTP_CreateDateString() second's current value `%d` is incorrect, it must be in the range 0-59.\n", second);
+        return NULL;
+    }
+
+    char num_string_array[5][8] = {0};
+    char year_string[8] = {0};
+    int num_value_array[] = { day_num, hour, minute, second };
+
+    for (int i = 0; i < ArrayCount(num_value_array); i++) {
+        if (num_value_array[i] < 10) {
+            sprintf(num_string_array[i], "0%d", num_value_array[i]);
+        }
+        else {
+            sprintf(num_string_array[i], "%d", num_value_array[i]);
+        }
+    }
+
+    sprintf(year_string, "%d", year);
+    int num_of_zeroes_to_prefix = 4 - strlen(year_string);
+    if (num_of_zeroes_to_prefix) {
+        memset(year_string, 0, 8);
+        int year_string_offset = 0;
+
+        for (int i = 0; i < num_of_zeroes_to_prefix; i++) {
+            sprintf(year_string+year_string_offset, "0");
+            year_string_offset++;
+        }
+
+        sprintf(year_string+year_string_offset, "%d", year);
+    }
+
+    char* date_string = PushString(arena, 124);
+    sprintf(date_string, "%s, %s %s %s %s:%s:%s GMT", day_name.string, num_string_array[0], month.string, year_string, num_string_array[1], num_string_array[2], num_string_array[3]);
+
+    return date_string;
+}
+
+static char* CreateResponseHeader(Arena* arena, enum HTTPStatusCode status_code, HeaderDict headers, CookieJar cookie_jar) {
+    char general_buffer[100] = {0};
+
+	char* http_response_header = PushString(arena, 8192);
 	sprintf(http_response_header, "HTTP/1.1 %s\r\n", HTTP_StatusCodeStrings[status_code]);
-    for (int x = 0; x < headers->count; x++) {
-        strcat(http_response_header, headers->keys[x]);
+    for (int x = 0; x < headers.count; x++) {
+        strcat(http_response_header, headers.keys[x]);
         strcat(http_response_header, ": ");
-        strcat(http_response_header, headers->values[x]);
+        strcat(http_response_header, headers.values[x]);
+        strcat(http_response_header, "\r\n");
+    }
+
+    for (int i = 0; i < cookie_jar.count; i++) {
+        strcat(http_response_header, "Set-Cookie: ");
+        strcat(http_response_header, cookie_jar.cookies[i].key);
+        strcat(http_response_header, "=");
+        strcat(http_response_header, cookie_jar.cookies[i].value);
+
+        if (cookie_jar.cookies[i].max_age > -1) {
+            sprintf(general_buffer, ";Max-Age=%lld", cookie_jar.cookies[i].max_age);
+            strcat(http_response_header, general_buffer);
+        }
+
+        if (cookie_jar.cookies[i].expires) {
+            strcat(http_response_header, ";Expires=");
+            strcat(http_response_header, cookie_jar.cookies[i].expires);
+        }
+
+        if (cookie_jar.cookies[i].path) {
+            strcat(http_response_header, ";Path=");
+            strcat(http_response_header, cookie_jar.cookies[i].path);
+        }
+
+        if (cookie_jar.cookies[i].domain) {
+            strcat(http_response_header, ";Domain=");
+            strcat(http_response_header, cookie_jar.cookies[i].domain);
+        }
+
+        if (cookie_jar.cookies[i].secure) {
+            strcat(http_response_header, ";Secure");
+        }
+
+        if (cookie_jar.cookies[i].http_only) {
+            strcat(http_response_header, ";HttpOnly");
+        }
+
         strcat(http_response_header, "\r\n");
     }
 
@@ -355,434 +492,11 @@ static void HTTP_ConvertContentTypeToFileExtension(char* content_type, char* fil
 	}
 }
 
-#if 0
-static bool HTTP_ParsePUTRequest(Arena* arena, HTTPRequestInfo* request_info, bool is_json_response) {
-	printf("[PUT Request Data] %s\n", request_info->request_body);
-    bool created_new_entry = false;
-
-    bool route_exists = false;
-    int route_index = 0;
-    for (; route_index < global_route_and_json_index+1; route_index++) {
-        if (!strcmp(global_route_and_json_array[route_index].route, request_info->route_to_use)) {
-            route_exists = true;
-            break;
-        }
-    }
-
-    if (is_json_response) {
-        if (route_exists) {
-            // Overwriting JSON data at route if it exists.
-            cJSON_Delete(global_route_and_json_array[route_index].data);
-            global_route_and_json_array[route_index].data = cJSON_Parse(request_info->request_body);
-            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
-        }
-        else {
-            // Creating a new route for JSON data if it doesn't exist.
-            created_new_entry = true;
-            global_route_and_json_index++;
-
-            global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
-                .route = HTTP_StringDup(arena, request_info->route_to_use),
-                .data = cJSON_Parse(request_info->request_body)
-            };
-            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[global_route_and_json_index].data));
-        }
-
-    }
-    else {
-        char file_extension[24] = {0};
-        HTTP_ConvertContentTypeToFileExtension(request_info->content_type, file_extension);
-        char file_name[256] = {0};
-        if (!strcmp(request_info->route_to_use, "/")) {
-            strcpy(file_name, "root");
-        }
-        else {
-            strcpy(file_name, request_info->route_to_use+1);
-        }
-
-        char full_file_path[300] = {0};
-        if (put_request_default_dir[0] == 0) {
-            sprintf(full_file_path, "%s.%s", file_name, file_extension);
-        }
-        else {
-            sprintf(full_file_path, "%s/%s.%s", put_request_default_dir, file_name, file_extension);
-        }
-
-        if (HTTP_FindFileSize(full_file_path) == -1) {
-            printf("[PUTS Request Handler] Couldn't find an existing file at file path `%s` creating a new file.\n", full_file_path);
-        }
-
-        // TODO: Find a better way to do logging.
-        if (HTTP_OverwriteFileContents(full_file_path, request_info->request_body)) {
-            printf("[PUTS Request Handler] Successfully overwrote data in file at file path `%s`.\n", full_file_path);
-        }
-
-        if (route_exists) {
-            cJSON* elem = NULL;
-            bool found_existing_match = false;
-            cJSON_ArrayForEach(elem, global_route_and_json_array[route_index].data) {
-                if (!strcmp(elem->string, "file")) {
-					found_existing_match = true;
-                    cJSON_SetValuestring(elem, full_file_path);
-                    break;
-                }
-            }
-
-            if (!found_existing_match) {
-                cJSON_AddItemToObject(global_route_and_json_array[route_index].data, "file", cJSON_CreateString(full_file_path));
-            }
-            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
-        }
-        else {
-            printf("[PUT Request] Created a new entry in global_route_and_json_array for file at file path `%s`.\n", full_file_path);
-
-            created_new_entry = true;
-            cJSON* item = cJSON_CreateObject();
-            cJSON_AddStringToObject(item, "file", full_file_path);
-
-            global_route_and_json_index++;
-            global_route_and_json_array[global_route_and_json_index] = (HTTPRouteJSON) {
-                .route = HTTP_StringDup(arena, request_info->route_to_use),
-                .data = item
-            };
-
-            printf("[PUT Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[global_route_and_json_index].data));
-        }
-
-    }
-
-    return created_new_entry;
-}
-
-static bool HTTP_ParseDELETERequest(HTTPRequestInfo* request_info) {
-    bool successfully_deleted_entry = false;
-	printf("[DELETE Request] %s\n", request_info->request_body);
-    for (int index = 0; index < global_route_and_json_index+1; index++) {
-        if (!strcmp(request_info->route_to_use, global_route_and_json_array[index].route)) {
-            printf("[DELETE Request] Found a matching route at index: %d\n", index);
-            // TODO: @memory_leak
-            printf("[DELETE Request] Data is route: `%s`, JSON Data: %s\n", global_route_and_json_array[index].route, cJSON_Print(global_route_and_json_array[index].data));
-
-            successfully_deleted_entry = true;
-            free(global_route_and_json_array[index].route);
-            cJSON_Delete(global_route_and_json_array[index].data);
-
-            // Checking if there was only 1 element in global_route_and_json_array initially.
-            if (global_route_and_json_index-1 == -1) {
-                global_route_and_json_index--;
-            }
-            else {
-                memmove(global_route_and_json_array, global_route_and_json_array+1, sizeof(HTTPRouteJSON)*global_route_and_json_index);
-                memset(global_route_and_json_array+global_route_and_json_index, 0, sizeof(HTTPRouteJSON));
-                global_route_and_json_index--;
-            }
-        }
-    }
-
-    return successfully_deleted_entry;
-}
-
-static void HTTP_ParsePOSTRequest(Arena* arena, HTTPRequestInfo* request_info) {
-	printf("[POST Request Data] %s\n", request_info->request_body);
-
-	StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(request_info->request_body);
-	char** key_value_pairs_array = request_key_value_pairs_array.array;
-	int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
-
-	bool route_exists = false;
-	int route_index = 0;
-	for (; route_index < global_route_and_json_index+1; route_index++) {
-		if (!strcmp(global_route_and_json_array[route_index].route, request_info->route_to_use)) {
-			route_exists = true;
-			break;
-		}
-	}
-
-	bool found_existing_match = false;
-	if (route_exists && request_info->request_body[0] != 0) {
-		for (int index = 0; index < max_key_value_pairs_array_matches; index += 2) {
-			found_existing_match = false;
-            
-            cJSON* item = NULL;
-            if (IsInteger(key_value_pairs_array[index+1])) {
-                char* endptr;
-                item = cJSON_CreateNumber(strtod(key_value_pairs_array[index+1], &endptr));
-            }
-            else if (!strcmp(key_value_pairs_array[index+1], "true")) {
-                item = cJSON_CreateBool(1);
-            }
-            else if (!strcmp(key_value_pairs_array[index+1], "false")) {
-                item = cJSON_CreateBool(0);
-            }
-            else if (!strcmp(key_value_pairs_array[index+1], "null")) {
-                item = cJSON_CreateNull();
-            }
-            else {
-                char* decoded_string = DecodeURL(key_value_pairs_array[index+1]);
-                item = cJSON_CreateString(decoded_string);
-                free(decoded_string);
-            }
-            // TODO: Support arrays?
-
-			cJSON* elem = NULL;
-			cJSON_ArrayForEach(elem, global_route_and_json_array[route_index].data) {
-				if (!strcmp(elem->string, key_value_pairs_array[index])) {
-					found_existing_match = true;
-
-                    item->string = ArenaAlloc(arena, strlen(elem->string)+1);
-                    strcpy(item->string, elem->string);
-                    cJSON_ReplaceItemViaPointer(global_route_and_json_array[route_index].data, elem, item);
-                    elem = item;
-                    break;
-				}
-			}
-
-			if (!found_existing_match) {
-                cJSON_AddItemToObject(global_route_and_json_array[route_index].data, key_value_pairs_array[index], item);
-			}
-		}
-	}
-
-	printf("[POST Request Processing]: %s\n", cJSON_Print(global_route_and_json_array[route_index].data));
-
-	FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
-}
-
-static HTTPGETRequest HTTP_ParseGETRequest(Arena* arena, HTTPRequestInfo* request_info, bool is_json_response, bool created_new_entry, bool deleted_entry) {
-	char* data_to_send = {0};
-	int data_to_send_length;
-	char* http_response_header = {0};
-	char* path_to_file_at_route = {0};
-
-    int file_path_index = 0;
-    bool route_exists = false;
-	for (; file_path_index < global_route_and_json_index+1; file_path_index++) {
-		if (!strcmp(global_route_and_json_array[file_path_index].route, request_info->route_to_use)) {
-            route_exists = true;
-            cJSON* elem = NULL;
-            cJSON_ArrayForEach(elem, global_route_and_json_array[file_path_index].data) {
-                if (!strcmp(elem->string, "file")) {
-                    path_to_file_at_route = elem->valuestring;
-                }
-            }
-            break;
-		}
-	}
-
-
-    if (deleted_entry) {
-        http_response_header = HTTP_StringDup(arena, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
-        data_to_send = HTTP_StringDup(arena, "<html><h1>Successfully deleted the resource you told us to delete.</h1></html>");
-        data_to_send_length = strlen(data_to_send);
-    }
-    else if (is_json_response) {
-        printf("-------------------------------\n");
-        printf("Sending a JSON Response at request path: %s\n", request_info->route_to_use);
-        printf("-------------------------------\n");
-
-        http_response_header = HTTP_CreateResponseHeaderFromFile(".json", created_new_entry);
-        if (http_response_header == NULL) {
-            printf("[ERROR] Couldn't generate JSON header for request path: %s\n", request_info->route_to_use);
-            return (HTTPGETRequest){NULL, NULL, 0};
-        }
-        
-        char* json_obj_string = cJSON_PrintUnformatted(global_route_and_json_array[file_path_index].data);
-        cJSON* json_obj = cJSON_Parse(json_obj_string);
-
-        if (request_info->contains_query_string) {
-            // Extracting variables and values into key_value_pairs_array;
-            StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(request_info->query_string);
-            char** key_value_pairs_array = request_key_value_pairs_array.array;
-            int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
-
-            bool found_match = false;
-            for (int key_index = 0; key_index < max_key_value_pairs_array_matches; key_index += 2) {
-                found_match = false;
-
-                cJSON* item = NULL;
-                if (IsInteger(key_value_pairs_array[key_index+1])) {
-                    char* endptr;
-                    item = cJSON_CreateNumber(strtod(key_value_pairs_array[key_index+1], &endptr));
-                }
-                else if (!strcmp(key_value_pairs_array[key_index+1], "true")) {
-                    item = cJSON_CreateBool(1);
-                }
-                else if (!strcmp(key_value_pairs_array[key_index+1], "false")) {
-                    item = cJSON_CreateBool(0);
-                }
-                else if (!strcmp(key_value_pairs_array[key_index+1], "null")) {
-                    item = cJSON_CreateNull();
-                }
-                else {
-                    char* decoded_string = DecodeURL(key_value_pairs_array[key_index+1]);
-                    item = cJSON_CreateString(decoded_string);
-                    free(decoded_string);
-                }
-
-                // Changing the values of existing key-value pairs in the json object with the value specified in the route.
-                cJSON* elem = NULL;
-                cJSON_ArrayForEach(elem, json_obj) {
-                    if (!strcmp(elem->string, key_value_pairs_array[key_index])) {
-                        found_match = true;
-
-                        item->string = ArenaAlloc(arena, strlen(elem->string)+1);
-                        strcpy(item->string, elem->string);
-                        cJSON_ReplaceItemViaPointer(json_obj, elem, item);
-                        elem = item;
-                    }
-                }
-
-                // Creating new key-value pairs in the json object with the key-value pair specified in the route.
-                if (!found_match) {
-                    cJSON_AddItemToObject(json_obj, key_value_pairs_array[key_index], item);
-                }
-            }
-
-            FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
-            data_to_send = cJSON_Print(json_obj);
-            data_to_send_length = strlen(data_to_send);
-            free(json_obj_string);
-        }
-        else {
-            data_to_send = json_obj_string;
-            data_to_send_length = strlen(json_obj_string);
-        }
-
-        cJSON_Delete(json_obj);
-    }
-    else {
-        // Checking if the route can be mapped to a path to an existing file.
-        char file_type[10] = {0};
-        char temp_buffer[256] = {0};
-
-        if (path_to_file_at_route == NULL && HTTP_ExtractFileTypeFromFilePath(request_info->route_to_use, file_type)) {
-            for (int index = 0; index < search_dirs_size; index++) {
-                if (search_dirs[index][strlen(search_dirs[index])-1] != '/' &&
-                    search_dirs[index][strlen(search_dirs[index])-1] != '\\') {
-
-                    sprintf(temp_buffer, "%s/%s", search_dirs[index], request_info->route_to_use+1);
-                }
-                else {
-                    sprintf(temp_buffer, "%s%s", search_dirs[index], request_info->route_to_use+1);
-                }
-                int file_size = HTTP_FindFileSize(temp_buffer);
-                if (file_size != -1) {
-                    path_to_file_at_route = temp_buffer;
-                    break;
-                }
-            }
-        }
-
-
-        if (path_to_file_at_route == NULL) {
-            return (HTTPGETRequest){NULL, NULL, 0};
-        }
-
-        data_to_send = HTTP_GetFileContents(path_to_file_at_route);
-        data_to_send_length = HTTP_FindFileSize(path_to_file_at_route);
-
-        // File was deleted or it's name was changed during runtime.
-        if (data_to_send_length == -1) {
-            return (HTTPGETRequest){NULL, NULL, 0};
-        }
-
-        // Not a recognised file type.
-        http_response_header = HTTP_CreateResponseHeaderFromFile(path_to_file_at_route, created_new_entry);
-        if (http_response_header == NULL) {
-            printf("[ERROR] Couldn't generate header for %s\n", path_to_file_at_route);
-            return (HTTPGETRequest){NULL, NULL, 0};
-        }
-
-        if (request_info->contains_query_string) {
-            // Using regex to extract matching variables from the file contents buffer.
-            StringArray variable_matches = StrRegexGetMatches(data_to_send, "{{[^}]*}}");
-            char** original_file_vars = variable_matches.array;
-            int max_original_file_vars_matches = variable_matches.count;
-
-            char** trim_file_vars = ArenaAlloc(arena, sizeof(char*)*max_original_file_vars_matches);
-            for (int index = 0; index < max_original_file_vars_matches; index++) {
-                char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
-                // Remove `}}` from the string.
-                temp[strlen(temp)-2] = 0;
-                trim_file_vars[index] = temp;
-            }
-
-            // Extracting variables and values into key_value_pairs_array;
-            StringArray request_key_value_pairs_array = ParseURIKeyValuePairString(request_info->query_string);
-            char** key_value_pairs_array = request_key_value_pairs_array.array;
-            int max_key_value_pairs_array_matches = request_key_value_pairs_array.count;
-
-
-            // Replacing variables in the file contents buffer with their values
-            for (int file_var_index = 0; file_var_index < max_original_file_vars_matches; file_var_index++) {
-                for (int key_index = 0; key_index < max_key_value_pairs_array_matches; key_index += 2) {
-                    // Adding 2 to the trimmed file variable to remove `{{` at the start.
-                    if (!strcmp(trim_file_vars[file_var_index]+2, key_value_pairs_array[key_index])) {
-                        StrReplaceSubstringAllOccurance(&data_to_send, original_file_vars[file_var_index], key_value_pairs_array[key_index+1]);
-                    }
-                }
-            }
-
-            FreeStringArray(original_file_vars, max_original_file_vars_matches);
-            FreeStringArray(trim_file_vars, max_original_file_vars_matches);
-            FreeStringArray(key_value_pairs_array, max_key_value_pairs_array_matches);
-
-            data_to_send_length = strlen(data_to_send);
-        }
-
-        // Checking if any of the variables are defined in global_variable_key_value_pairs_array.
-        // Getting regex again because we do not want to override any of the variables which were
-        // changed by values defined in the route itself.
-        StringArray variable_matches = StrRegexGetMatches(data_to_send, "{{[^}]*}}");
-        char** original_file_vars = variable_matches.array;
-        int max_original_file_vars_matches = variable_matches.count;
-
-        char** trim_file_vars = ArenaAlloc(arena, sizeof(char*)*max_original_file_vars_matches);
-        for (int index = 0; index < max_original_file_vars_matches; index++) {
-            char* temp = RemoveWhitespaceFrontAndBack(original_file_vars[index], 2, 2);
-            // Remove `}}` from the string.
-            temp[strlen(temp)-2] = 0;
-            trim_file_vars[index] = temp;
-        }
-
-        if (route_exists) {
-            printf("[GET PROCESSSING]: %s\n", cJSON_Print(global_route_and_json_array[file_path_index].data));
-            bool found_matches = false;
-
-            for (int i = 0; i < max_original_file_vars_matches; i++) {
-                cJSON* elem = NULL;
-                cJSON_ArrayForEach(elem, global_route_and_json_array[file_path_index].data) {
-                    if (!strcmp(elem->string, trim_file_vars[i]+2)) {
-                        found_matches = true;
-                        // TODO: VERY DANGEROUS, NEED TO CHECK WHAT DATA IS STORED IN THE OBJECT FIRST!
-                        StrReplaceSubstringAllOccurance(&data_to_send, original_file_vars[i], elem->valuestring);
-                    }
-                }
-            }
-
-            if (found_matches) {
-                data_to_send_length = strlen(data_to_send);
-            }
-        }
-
-        FreeStringArray(original_file_vars, max_original_file_vars_matches);
-        FreeStringArray(trim_file_vars, max_original_file_vars_matches);
-    }
-
-	return (HTTPGETRequest) {
-		.http_response_header = http_response_header,
-		.data_to_send = data_to_send,
-		.data_to_send_length = data_to_send_length
-	};
-
-}
-#endif
-
 static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_body) {
 	printf("[POST Request Data] %s\n", request_body);
     Temp scratch = GetScratch(0, 0);
 
-	Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_body);
+	Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_body, '&');
 
     request_info->json_request_body = cJSON_CreateObject();
 	if (request_body[0] != 0) {
@@ -836,7 +550,7 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
         }
 
         // Extracting variables and values into key_value_pairs_array;
-        Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_info->query_string);
+        Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_info->query_string, '&');
 
         // Replacing variables in the file contents buffer with their values
         for (int file_var_index = 0; file_var_index < original_file_vars_matches.count; file_var_index++) {
@@ -872,6 +586,7 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
             cJSON* elem = NULL;
             cJSON_ArrayForEach(elem, variables) {
                 if (!strcmp(elem->string, trim_file_vars[i])) {
+                    // TODO: Make this use HTTP_cJSON_GetStringValue().
                     char string_buf[256] = {0};
                     char* string_val = cJSON_GetStringValue(elem);
 
@@ -909,8 +624,44 @@ void HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key
     header_dict->count++;
 }
 
+void HTTP_AddCookieToCookieJar(Arena* arena,
+                               CookieJar* cookie_jar,
+                               char* key,
+                               char* value,
+                               int64_t max_age,
+                               char* expires,
+                               char* path,
+                               char* domain,
+                               bool secure,
+                               bool http_only) {
+
+    if (key == NULL) {
+        printf("[ERROR] HTTP_AddCookieToCookieJar() can't add cookie to cookie jar as the key is NULL.\n");
+        return;
+    }
+
+    if (value == NULL) {
+        printf("[ERROR] HTTP_AddCookieToCookieJar() can't add cookie to cookie jar as the value is NULL.\n");
+        return;
+    }
+
+    cookie_jar->cookies[cookie_jar->count] = (Cookie) {
+        .key       = key ? HTTP_StringDup(arena, key) : NULL,
+        .value     = value ? HTTP_StringDup(arena, value) : NULL,
+        .max_age   = max_age,
+        .expires   = expires ? HTTP_StringDup(arena, expires) : NULL,
+        .path      = path ? HTTP_StringDup(arena, path) : NULL,
+        .domain    = domain ? HTTP_StringDup(arena, domain) : NULL,
+        .secure    = secure,
+        .http_only = http_only
+    };
+
+    cookie_jar->count++;
+}
+
+
 void* Arena_cJSONMalloc(size_t size) {
-    return ArenaAllocAligned(allocator.permanent_arena, size, sizeof(char), sizeof(void*));
+    return ArenaAllocAligned(allocator.recycle_arena, size, sizeof(char), sizeof(void*));
 }
 
 void Arena_cJSONFree(void* object) {
@@ -966,9 +717,6 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 		printf("[SERVER] Listening on IP Address: %s, and Port Number: %s\n", server_ip_address, server_port);
 	}
 
-    // TODO: This is stupid, remove it immediately once we support databases.
-    //       Since we are never removing any of the data on allocator.permanent_arena
-    //       we just keep on piling up the allocations.
     cJSON_Hooks cjson_arena_hooks = { Arena_cJSONMalloc, Arena_cJSONFree };
     cJSON_InitHooks(&cjson_arena_hooks);
 
@@ -1050,6 +798,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			index += 4;
 
             /* request_info.request_body = HTTP_StringDup(allocator.recycle_arena, receiving_buffer+index); */
+            request_info.cookies.count = 0;
 
 			for (int index = 0; index < request_info.headers.count; index ++) {
 				if (!strcmp(request_info.headers.keys[index], "Content-Type")) {
@@ -1059,9 +808,14 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 						printf("------------------------------\n");
 						request_info.is_json_request = true;
                     }
-
                     break;
 				}
+                else if (!strcmp(request_info.headers.keys[index], "Cookie")) {
+                    printf("------------------------------\n");
+                    printf("GOT COOKIES!!!\n");
+                    printf("------------------------------\n");
+                    request_info.cookies = ParseURIKeyValuePairString(allocator.recycle_arena, request_info.headers.values[index], ':');
+                }
 			}
 
             if (!strcmp(request_info.request_method, "POST") && !request_info.is_json_request) {
@@ -1093,9 +847,16 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
 			/* 	HTTP_ParsePOSTRequest(allocator.permanent_arena, &request_info); */
 			/* } */
 
+            /* if (HTTP_Auth_SessionCheckIsEnabled()) { */
+            /*     HTTP_Auth_SessionUserAllowed(request_info.cookies); */
+            /* } */
+
             HTTPResponse output = {0};
             output.headers.keys = PushArray(allocator.recycle_arena, char*, 50);
             output.headers.values = PushArray(allocator.recycle_arena, char*, 50);
+
+            // NOTE: Someone on the internet said that 300 cookies were the maximum per website.
+            output.cookie_jar.cookies = PushArray(allocator.recycle_arena, Cookie, 300);
 
             output.response_body.count = -1;
 
@@ -1186,7 +947,7 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
             }
 
 
-            char* http_response_header = HTTP_CreateResponseHeader(allocator.recycle_arena, output.status_code, &output.headers);
+            char* http_response_header = CreateResponseHeader(allocator.recycle_arena, output.status_code, output.headers, output.cookie_jar);
 			send(client_socket, http_response_header, (int)strlen(http_response_header), 0);
 			send(client_socket, output.response_body.string, output.response_body.count, 0);
 

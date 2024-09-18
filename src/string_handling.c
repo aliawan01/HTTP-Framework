@@ -1,6 +1,16 @@
 #include "util.h"
 #include "string_handling.h"
 
+bool ContainsWhitespace(char* string) {
+    for (int i = 0; i < strlen(string); i++) {
+        if (string[i] == ' ') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool IsInteger(char* string) {
 	bool is_int = true;
     int decimal_point_occurances = 0;
@@ -22,6 +32,7 @@ bool IsInteger(char* string) {
 }
 
 char* HTTP_StringDup(Arena* arena, char* source) {
+    Assert(source != NULL);
     char* duplicate = PushString(arena, strlen(source)+1);
     Assert(duplicate != NULL);
     memcpy(duplicate, source, strlen(source)+1);
@@ -158,7 +169,7 @@ Dict ParseHeaderIntoDict(Arena* arena, char* header_string) {
 			header_string[i] = ':';
 			original_i = i+1;
 		}
-		else if (header_string[i] == '\r' && header_string[i+1] == '\n' && header_string[i+2] != '\r' && !on_value) {
+		else if (header_string[i] == '\r' && header_string[i+1] == '\n' && !on_value) {
 			on_value = true;
 			on_key = false;
 			header_string[i] = 0;
@@ -183,7 +194,7 @@ Dict ParseHeaderIntoDict(Arena* arena, char* header_string) {
 	};
 }
 
-Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
+Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string, char separator) {
 	char** key_array = PushArray(arena, char*, 200);
 	char** value_array = PushArray(arena, char*, 200);
 	int dict_index = 0;
@@ -193,7 +204,7 @@ Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string) {
 
     bool on_key = true;
 	while (true) {
-		if (uri_string[i] == '=' || uri_string[i] == '&' || !uri_string[i]) {
+		if (uri_string[i] == '=' || uri_string[i] == separator || !uri_string[i]) {
 			char original_char = uri_string[i];
 			uri_string[i] = 0;
 

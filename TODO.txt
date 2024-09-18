@@ -12,7 +12,42 @@
     methods to allow the user to implement the functionality on their own.
     - See if we have some more features to add.
 
+
+  *** Authentication
+     - Sessions 
+
+
+
+       - Allow the user to specify data they want in the form e.g. email address, username
+         and password and CREATE/ALTER the table based upon that.
+         - Use this data when verifying a user in HTTP_Auth_AddUserIfNotExists()
+         - Give the user a cookie containing their SessionID when we create it in 
+           HTTP_Auth_AddUserIfNotExists() as well.
+
+       - Go through the TODO's in the project.
+       - Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
+         (e.g. the SQL commands which are being executed).
+
+  *** Authorization
+      - Check how other framworks do it.
+      - Could assign each route to a group and when authentication is enabled
+        we could create policies which dictate which routes a certain user is 
+        allowed to access including which methods they are allowed to send requests
+        on e.g. GET, POST and DELETE or just GET etc.
+
+  *** Fix some of the weird code/potential bugs in HTTP_InsertJSONIntoDatabase().
+
+  *** Make the expiry_date system in HTTP_CreateDateString() more robust so we can convert 
+      from local time to GMT? -> May need to use time.h for this.
+
   *** Add cookies.
+      - Understand how expire and the other flags work and use HTTP_CreateDateString()
+        to test expire.
+      - Once we support TLS make sure that all cookies have the secure flag set 
+        by default.
+
+  *** Turn global_route_callback_array into a Hash Map or use a hashmap containing
+      indexes for routes in global_route_callback_array when trying to index a route.
 
   ** Create some wrapper functions around cJSON for extra JSON functionality 
       the user may need (e.g. like the code in the sql callback functions to find 
@@ -20,14 +55,14 @@
       - Add function for type checking a value when making a cJSON object in
         cjson_helper.c
 
+
   ** Maybe add redirect routes inside callback functions it will just find an existing
       route entry the global_route_callback_array and if there is one if it will call their
       callback function.
 
+  ** Make the templating more advanced by implementing functionality like
+       url_for() in Flask.
 
-  - Remove the cjson_arena_hooks immediately after we support databases and
-    that means we probably won't need the permanent_arena either and can return
-    back to just using a global_arena.
 
   - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()
     functions from files which are text file (images and videos should not be allowed

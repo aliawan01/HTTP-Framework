@@ -12,19 +12,19 @@ void ArenaInit(Arena* arena, uint64_t arena_size) {
 
 void* ArenaAllocAligned(Arena* arena, uintptr_t num_of_elem, uintptr_t elem_size, uintptr_t align_size) {
     Assert(IsPowerOfTwo(align_size));
-
+    
     uintptr_t allocation_size = num_of_elem * elem_size;
     Assert(allocation_size >= elem_size);
-
+    
     uintptr_t cur_offset = (uintptr_t)arena->current_offset + (uintptr_t)arena->buffer;
     uintptr_t padding = (~cur_offset+1) & (align_size-1);
-
+    
     cur_offset += padding;
-
+    
     if (cur_offset + allocation_size > (uintptr_t)arena->buffer_size + (uintptr_t)arena->buffer) {
         return NULL;
     }
-
+    
     arena->current_offset += (padding + allocation_size);
     memset((void*)cur_offset, 0, allocation_size);
     
@@ -35,7 +35,7 @@ bool ArenaIncrementOffset(Arena* arena, uint64_t increment_value) {
     if (arena->current_offset + increment_value > arena->buffer_size) {
         return false;
     }
-
+    
     memset(arena->buffer+arena->current_offset, 0, increment_value);
     arena->current_offset += increment_value;
     return true;
@@ -60,7 +60,7 @@ void TempEnd(Temp temp) {
     temp.arena->current_offset = temp.original_offset;
 }
 
-Temp  ScratchGetFree(Arena** arena_pool, int arena_pool_num, Arena** conflicting_arenas, int conflicting_num) {
+Temp ScratchGetFree(Arena** arena_pool, int arena_pool_num, Arena** conflicting_arenas, int conflicting_num) {
     bool is_conflicting_arena;
     for (int i = 0; i < arena_pool_num; i++) {
         is_conflicting_arena = false;
@@ -70,12 +70,12 @@ Temp  ScratchGetFree(Arena** arena_pool, int arena_pool_num, Arena** conflicting
                 break;
             }
         }
-
+        
         if (!is_conflicting_arena) {
             return TempBegin(arena_pool[i]);
         }
     }
-
+    
     Assert(is_conflicting_arena != false);
     return (Temp){NULL, 20};
 }
