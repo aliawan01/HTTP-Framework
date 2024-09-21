@@ -2,6 +2,21 @@
 
 #include "platform.h"
 #include "arena.h"
+
+typedef struct {
+    char* string;
+    uint64_t count;
+} String;
+
+typedef struct {
+    char** array;
+    int count;
+} StringArray;
+
+static bool IsPowerOfTwo(uint64_t num) {
+    return (num != 0) && (num & (num-1)) == 0;
+}
+
 #include "cjson_helper.h"
 
 // Macros
@@ -18,24 +33,11 @@
 #define Maximum(a, b) (a > b) ? a : b
 #define Minimum(a, b) (a < b) ? a : b
 
-static bool IsPowerOfTwo(uint64_t num) {
-    return (num != 0) && (num & (num-1)) == 0;
-}
-
-typedef struct {
-    char* string;
-    uint64_t count;
-} String;
-
-typedef struct {
-    char** array;
-    int count;
-} StringArray;
-
+char* ConvertStrArrayToString(Arena* arena, StringArray string_array, char* separator);
 #define StrLit(string) (String) {(char*)string, sizeof(string)-1}
 #define HTTP_StrLit(string) StrLit(string)
-// NOTE: Pass in an array like { "foo", "bar", "baz" }
-#define StrArrayLit(...) (StringArray) {(char*[])__VA_ARGS__, sizeof((char*[])__VA_ARGS__)/sizeof((char*[])__VA_ARGS__[0])}
+// NOTE: Pass in an list of strings like "foo", "bar", "baz" 
+#define StrArrayLit(...) (StringArray) {(char*[]){__VA_ARGS__}, sizeof((char*[]){__VA_ARGS__})/sizeof((char*[]){__VA_ARGS__}[0])}
 
 typedef struct {
     Arena* permanent_arena;

@@ -67,3 +67,13 @@ char* HTTP_cJSON_GetStringValue(Arena* arena, cJSON* elem) {
 
     return string_buf;
 }
+
+void HTTP_cJSON_AddPermissionArrayToObject(cJSON* object, StringArray permissions) {
+    cJSON* array = cJSON_AddArrayToObject(object, "permissions");
+
+    if (array) {
+        for (int i = 0; i < permissions.count; i++) {
+            cJSON_AddItemToArray(array, cJSON_CreateString(permissions.array[i]));
+        }
+    }
+}

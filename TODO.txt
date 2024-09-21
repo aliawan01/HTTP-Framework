@@ -1,60 +1,29 @@
 * PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
 
-  - Migrate to using a database for storing file paths, and global and local
-    variables for each route.
-  - Use function pointers for routes to allow the user to generate their own 
-    responses.
-  - Provide useful functions to allow the user to do what they want to do when
-    creating a response.
 
-  * Turn the functionality of the ParsePOSTRequest() into a set of useful
-    methods to allow the user to implement the functionality on their own.
-    - See if we have some more features to add.
+  *** Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
+     data will be sent) -> this will need multithreading to handle multiple clients.
 
+  ** Add TLS encryption to the sockets.
+
+  ** Support mutliple clients using thread pools?
+
+  * Make an example REST API.
 
   *** Authentication
-     - Sessions 
-
-
-
-       - Allow the user to specify data they want in the form e.g. email address, username
-         and password and CREATE/ALTER the table based upon that.
-         - Use this data when verifying a user in HTTP_Auth_AddUserIfNotExists()
-         - Give the user a cookie containing their SessionID when we create it in 
-           HTTP_Auth_AddUserIfNotExists() as well.
-
-       - Go through the TODO's in the project.
-       - Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
-         (e.g. the SQL commands which are being executed).
-
-  *** Authorization
-      - Check how other framworks do it.
-      - Could assign each route to a group and when authentication is enabled
-        we could create policies which dictate which routes a certain user is 
-        allowed to access including which methods they are allowed to send requests
-        on e.g. GET, POST and DELETE or just GET etc.
-
-  *** Fix some of the weird code/potential bugs in HTTP_InsertJSONIntoDatabase().
-
-  *** Make the expiry_date system in HTTP_CreateDateString() more robust so we can convert 
-      from local time to GMT? -> May need to use time.h for this.
+      - Add support for running ALTER on the session authentication table to add or 
+        remove fields if it already exists.
+      - Move away from using a 256 digit random number as the SessionID, use
+        a proper hashing algorithm with some Salt (e.g. SHA256).
+      - Hash user login data in the database.
 
   *** Add cookies.
-      - Understand how expire and the other flags work and use HTTP_CreateDateString()
-        to test expire.
       - Once we support TLS make sure that all cookies have the secure flag set 
         by default.
 
   *** Turn global_route_callback_array into a Hash Map or use a hashmap containing
       indexes for routes in global_route_callback_array when trying to index a route.
-
-  ** Create some wrapper functions around cJSON for extra JSON functionality 
-      the user may need (e.g. like the code in the sql callback functions to find 
-      the type of a variable before adding it into the cJSON object).
-      - Add function for type checking a value when making a cJSON object in
-        cjson_helper.c
-
 
   ** Maybe add redirect routes inside callback functions it will just find an existing
       route entry the global_route_callback_array and if there is one if it will call their
@@ -63,6 +32,9 @@
   ** Make the templating more advanced by implementing functionality like
        url_for() in Flask.
 
+  * Go through the TODO's in the project.
+  * Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
+    (e.g. the SQL commands which are being executed).
 
   - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()
     functions from files which are text file (images and videos should not be allowed
@@ -71,10 +43,6 @@
       HTTP_GetFileContents() if it is then we know it is probably a text file
       otherwise it will probably be a video or an image.
 
-  - Start to integrate a database to allow the user to manage the json information
-    themselves.
-
-  - Make an example REST API.
 
 * Arena 
   * Allocate and deallocate pages as necessary (default page size should be 
@@ -105,8 +73,6 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
 * Support parsing lists in json.
 * Add cookies
 
-- Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
-  data will be sent) -> this will need multithreading to handle multiple clients.
 - Make server logs easier to read and add colour
 - Abstract sockets methods so that we can support Windows and Linux.
 - Add SSL/TLS encryption.

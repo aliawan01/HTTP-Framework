@@ -17,8 +17,13 @@ void HTTP_Auth_SessionEnable(char* auth_table_name,
         return;
     }
 
+    if (!HTTP_IsDatabaseConnected()) {
+        printf("[ERROR] HTTP_Auth_SessionEnable() Cannot use session authentication as no database has been attached, try running HTTP_CreateDatabase().\n");
+        return;
+    }
+
     // TODO: Remove this after testing.
-    /* HTTP_RunSQLQuery("DROP TABLE SessionAuthTable;", false, false); */
+    HTTP_RunSQLQuery("DROP TABLE SessionAuthTable;", false, false);
     
     char check_table_exists_query[256] = {0};
     sprintf(check_table_exists_query, "SELECT name FROM sqlite_master WHERE type='table' AND name='{%s}'", auth_table_name);
@@ -76,8 +81,12 @@ void HTTP_Auth_SessionEnable(char* auth_table_name,
             printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the login data contains the name `SessionID` which conflicts with the field the system uses to calculate when a session is expired, please rename this field.\n");
             return;
         }
-        if (!strcmp(login_data.array[i], "__Session_ExpiryDate")) {
+        else if (!strcmp(login_data.array[i], "__Session_ExpiryDate")) {
             printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the login data contains the name `__Session_ExpiryDate` which conflicts with the field the system uses to calculate when a session is expired, please rename this field.\n");
+            return;
+        }
+        else if (!strcmp(login_data.array[i], "__Session_Permissions")) {
+            printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the login data contains the name `__Session_Permissions` which conflicts with the field the system uses to keep track of the permissions of each user, please rename this field.\n");
             return;
         }
     }
@@ -87,15 +96,19 @@ void HTTP_Auth_SessionEnable(char* auth_table_name,
             printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the user data contains the name `SessionID` which conflicts with the field the system uses to calculate when a session is expired, please rename this field.\n");
             return;
         }
-        if (!strcmp(user_data.array[i], "__Session_ExpiryDate")) {
+        else if (!strcmp(user_data.array[i], "__Session_ExpiryDate")) {
             printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the user data contains the name `__Session_ExpiryDate` which conflicts with the field the system uses to calculate when a session is expired, please rename this field.\n");
+            return;
+        }
+        else if (!strcmp(user_data.array[i], "__Session_Permissions")) {
+            printf("[ERROR] HTTP_Auth_SessionEnable() One of the fields in the login data contains the name `__Session_Permissions` which conflicts with the field the system uses to keep track of the permissions of each user, please rename this field.\n");
             return;
         }
     }
 
     char create_auth_table_query[512] = {0};
 
-    sprintf(create_auth_table_query, "CREATE TABLE IF NOT EXISTS %s(SessionID VARCHAR(256) PRIMARY KEY, ", auth_table_name);
+    sprintf(create_auth_table_query, "CREATE TABLE IF NOT EXISTS %s(SessionID VARCHAR(256) PRIMARY KEY, __Session_ExpiryDate TEXT, __Session_Permissions TEXT", auth_table_name);
 
     StringArray fields_to_insert[2] = { login_data, user_data };
     StringArray types_to_insert[2] = { login_data_types, user_data_types };
@@ -105,21 +118,15 @@ void HTTP_Auth_SessionEnable(char* auth_table_name,
                 printf("[ERROR] HTTP_Auth_SessionEnable() Field: `%s` at index: `%d` contains a whitespace which is not allowed.\n", fields_to_insert[x].array[i], i);
                 return;
             }
-            strcat(create_auth_table_query, "'");
+            strcat(create_auth_table_query, ", '");
             strcat(create_auth_table_query, fields_to_insert[x].array[i]);
             strcat(create_auth_table_query, "' ");
             strcat(create_auth_table_query, types_to_insert[x].array[i]);
-            strcat(create_auth_table_query, ", ");
         }
     }
 
-    strcat(create_auth_table_query, "__Session_ExpiryDate TEXT);");
+    strcat(create_auth_table_query, ");");
     printf("create_auth_table_query: %s\n", create_auth_table_query);
-
-    if (!HTTP_IsDatabaseConnected()) {
-        printf("[ERROR] HTTP_Auth_SessionEnable() Cannot use session authentication as no database has been attached, try running HTTP_CreateDatabse().\n");
-        return;
-    }
 
     cJSON* output = HTTP_RunSQLQuery(create_auth_table_query, false, true);
     if (output != NULL) {
@@ -276,28 +283,30 @@ char* __HTTP_Auth_AddUserIfNotExists(Arena* arena, ...) {
 
     printf("Original Count: %d, NULL Count: %d, Not-NULL Count: %d\n\n", count, null_count, count-null_count);
 
-    if (count-null_count < session_auth.login_data.count) {
-        printf("[ERROR] HTTP_Auth_AddUserIfNotExists() Not enough arguments to identify the new user, required arguments: `%d`, supplied arguments: `%d`.\n", session_auth.login_data.count, count-null_count);
+    if (count-null_count < session_auth.login_data.count+1) {
+        printf("[ERROR] HTTP_Auth_AddUserIfNotExists() Not enough valid arguments to identify the new user, required valid arguments: `%d`, supplied valid arguments: `%d`, arguments which have a value of NULL: `%d`.\n", session_auth.login_data.count+1, count-null_count, null_count);
         return NULL;
     }
 
     sprintf(user_exists_query_string, "SELECT * FROM %s WHERE ", session_auth.auth_table_name);
-    sprintf(insert_user_query_string, "INSERT INTO %s(SessionID, ", session_auth.auth_table_name);
+    sprintf(insert_user_query_string, "INSERT INTO %s(SessionID, __Session_Permissions, ", session_auth.auth_table_name);
 
     char* session_id = PushString(arena, HTTP_SESSION_ID_LENGTH);
     HTTP_Gen256ByteRandomNum(session_id, HTTP_SESSION_ID_LENGTH);
-    sprintf(insert_user_query_string_arguments, "VALUES ('%s', ", session_id);
+
+    char* permissions_string = insert_user_query_arguments_array[0][0] == 0 ? "global" : insert_user_query_arguments_array[0]; 
+    sprintf(insert_user_query_string_arguments, "VALUES ('%s', '%s', ", session_id, permissions_string);
 
     int i = 0;
     for (; i < session_auth.login_data.count; i++) {
-        if (insert_user_query_arguments_array[i][0] == 0) {
+        if (insert_user_query_arguments_array[i+1][0] == 0) {
             printf("[ERROR] HTTP_Auth_AddUserIfNotExists() The required login field `%s` has been set to NULL, please change it to an valid value.\n", session_auth.login_data.array[i]);
             return NULL;
         }
 
         strcat(user_exists_query_string, session_auth.login_data.array[i]);
         strcat(user_exists_query_string, "='");
-        strcat(user_exists_query_string, insert_user_query_arguments_array[i]);
+        strcat(user_exists_query_string, insert_user_query_arguments_array[i+1]);
         strcat(user_exists_query_string, "'");
 
         strcat(insert_user_query_string, "'");
@@ -305,7 +314,7 @@ char* __HTTP_Auth_AddUserIfNotExists(Arena* arena, ...) {
         strcat(insert_user_query_string, "'");
 
         strcat(insert_user_query_string_arguments, "'");
-        strcat(insert_user_query_string_arguments, insert_user_query_arguments_array[i]);
+        strcat(insert_user_query_string_arguments, insert_user_query_arguments_array[i+1]);
         strcat(insert_user_query_string_arguments, "'");
 
         strcat(insert_user_query_string_arguments, ", ");
@@ -319,7 +328,7 @@ char* __HTTP_Auth_AddUserIfNotExists(Arena* arena, ...) {
 
     int max_count = session_auth.login_data.count+session_auth.user_data.count; 
     for (int x = 0; i < count && i < max_count; i++, x++) {
-        if (insert_user_query_arguments_array[i][0] == 0) {
+        if (insert_user_query_arguments_array[i+1][0] == 0) {
             continue;
         }
 
@@ -328,7 +337,7 @@ char* __HTTP_Auth_AddUserIfNotExists(Arena* arena, ...) {
         strcat(insert_user_query_string, "'");
 
         strcat(insert_user_query_string_arguments, "'");
-        strcat(insert_user_query_string_arguments, insert_user_query_arguments_array[i]);
+        strcat(insert_user_query_string_arguments, insert_user_query_arguments_array[i+1]);
         strcat(insert_user_query_string_arguments, "', ");
     }
 
@@ -381,7 +390,64 @@ char* HTTP_Auth_cJSON_AddUserIfNotExists(Arena* arena, cJSON* data) {
         return NULL;
     }
 
+    cJSON* elem = NULL;
+    cJSON_ArrayForEach(elem, data) {
+        if (cJSON_IsObject(elem)) {
+            printf("[ERROR] HTTP_Auth_cJSON_AddUserIfNotExists() The JSON data you have provided contains nested objects which are not supported.\n");
+            return NULL;
+        }
+    }
+
     Temp scratch = GetScratch(&arena, 1);
+
+    char permission_string[1024] = {0};
+    bool contains_permissions = false;
+    cJSON_ArrayForEach(elem, data) {
+        if (!strcmp(elem->string, "permissions")) {
+            contains_permissions = true;
+            char* has_permission_string = cJSON_GetStringValue(elem); 
+            if (has_permission_string) {
+                strcpy(permission_string, has_permission_string);
+            }
+            else if (cJSON_IsArray(elem)) {
+                // NOTE: Array is empty.
+                if (elem->child == NULL) {
+                    contains_permissions = false;
+                    break;
+                }
+
+                cJSON* permission_elem = NULL;
+                cJSON_ArrayForEach(permission_elem, elem) {
+                    if (cJSON_IsObject(permission_elem)) {
+                        printf("[ERROR] HTTP_Auth_cJSON_AddUserIfNotExists() The permissions you have specified contains nested objects which is invalid.\n");
+                        DeleteScratch(scratch);
+                        return NULL;
+                    }
+                    else if (cJSON_IsArray(permission_elem)) {
+                        printf("[ERROR] HTTP_Auth_cJSON_AddUserIfNotExists() The permissions you have specified contains a nested array which is invalid.\n");
+                        DeleteScratch(scratch);
+                        return NULL;
+                    }
+
+                    strcat(permission_string, HTTP_cJSON_GetStringValue(scratch.arena, permission_elem));
+                    strcat(permission_string, ",");
+                }
+            }
+            else {
+                printf("[ERROR] HTTP_Auth_cJSON_AddUserIfNotExists() The permissions you have specified is neither a string or an array of strings, therefore it is invalid.\n");
+                return NULL;
+                DeleteScratch(scratch);
+            }
+            
+            break;
+        }
+    }
+
+    if (!contains_permissions) {
+        strcpy(permission_string, "global");
+    }
+
+    printf("permissions: `%s`\n", permission_string);
 
     char user_exists_query_string[2056] = {0};
     char insert_user_query_string[2056] = {0};
@@ -394,11 +460,10 @@ char* HTTP_Auth_cJSON_AddUserIfNotExists(Arena* arena, cJSON* data) {
     GenerateTimeoutField(timeout_field_string, 256);
 
     sprintf(user_exists_query_string, "SELECT * FROM %s WHERE ", session_auth.auth_table_name);
-    sprintf(insert_user_query_string, "INSERT INTO %s(SessionID, __Session_ExpiryDate", session_auth.auth_table_name);
-    sprintf(insert_user_query_string_arguments, ") VALUES ('%s', %s", session_id, timeout_field_string);
+    sprintf(insert_user_query_string, "INSERT INTO %s(SessionID, __Session_ExpiryDate, __Session_Permissions", session_auth.auth_table_name);
+    sprintf(insert_user_query_string_arguments, ") VALUES ('%s', %s, '%s'", session_id, timeout_field_string, permission_string);
 
     bool prev_user_exists_element_added = false;
-    cJSON* elem = NULL;
     cJSON_ArrayForEach(elem, data) {
         for (int i = 0; i < session_auth.login_data.count; i++) {
             if (!strcmp(elem->string, session_auth.login_data.array[i])) {
@@ -833,7 +898,7 @@ char* HTTP_Auth_SetLoginAndUserDataAtSessionToken(Arena* arena, char* session_id
     return new_session_id;
 }
 
-char* HTTP_Auth_GetSessionIDAtLoginDetails(Arena* arena, cJSON* login_data) {
+char* HTTP_Auth_GetSessionIDAtLoginDetails(cJSON* login_data) {
     if (!cJSON_IsObject(login_data)) {
         printf("[ERROR] HTTP_Auth_GetSessionIDAtLoginDetails() The login data must just be a JSON object, the one you have provided is not.\n");
         return NULL;
@@ -843,7 +908,7 @@ char* HTTP_Auth_GetSessionIDAtLoginDetails(Arena* arena, cJSON* login_data) {
         return NULL;
     }
 
-    Temp scratch = GetScratch(&arena, 1);
+    Temp scratch = GetScratch(0, 0);
 
     char query_string[2056] = {0};
     sprintf(query_string, "SELECT SessionID FROM %s WHERE ", session_auth.auth_table_name);
@@ -890,10 +955,177 @@ bool HTTP_Auth_ExpireSessionID(char* session_id) {
     char query_string[2056] = {0};
     sprintf(query_string, "UPDATE %s SET __Session_ExpiryDate=datetime('now', '-200 years') WHERE SessionID='%s';", session_auth.auth_table_name, session_id);
     if (HTTP_RunSQLQuery(query_string, false, false) == NULL) {
-        printf("[ERROR] HTTP_Auth_ExpireSessionID() An error occured when running the SQL code to expire the Session ID.");
+        printf("[ERROR] HTTP_Auth_ExpireSessionID() An error occured when running the SQL code to expire the Session ID.\n");
         return false;
     }
     else {
         return true;
     }
+}
+
+StringArray HTTP_Auth_StringArray_GetPermissionsAtSessionID(Arena* arena, char* session_id) {
+    if (!HTTP_Auth_CheckSessionIDExists(session_id)) {
+        return (StringArray) {NULL, 0};
+    }
+
+    char query_string[2056] = {0};
+    sprintf(query_string, "SELECT __Session_Permissions FROM %s WHERE SessionID='%s';", session_auth.auth_table_name, session_id);
+    cJSON* permission_query_result = HTTP_RunSQLQuery(query_string, false, true);
+    if (permission_query_result == NULL) {
+        printf("[ERROR] HTTP_Auth_StringArray_GetPermissionsAtSessionID() An error occured when running the SQL code to get the permissions at the Session ID.\n");
+        return (StringArray) {NULL, 0};
+    }
+
+    return StrSplitStringOnSeparator(arena, permission_query_result->child->valuestring, ",");
+}
+
+cJSON* HTTP_Auth_cJSON_GetPermissionsAtSessionID(char* session_id) {
+    if (!HTTP_Auth_CheckSessionIDExists(session_id)) {
+        return NULL;
+    }
+
+    char query_string[2056] = {0};
+    sprintf(query_string, "SELECT __Session_Permissions FROM %s WHERE SessionID='%s';", session_auth.auth_table_name, session_id);
+    cJSON* permission_query_result = HTTP_RunSQLQuery(query_string, false, true);
+    if (permission_query_result == NULL) {
+        printf("[ERROR] HTTP_Auth_cJSON_GetPermissionsAtSessionID() An error occured when running the SQL code to get the permissions at the Session ID.\n");
+        return NULL;
+    }
+
+    Temp scratch = GetScratch(0, 0);
+    StringArray permissions_string_array = StrSplitStringOnSeparator(scratch.arena, permission_query_result->child->valuestring, ",");
+    cJSON* permissions_obj = cJSON_CreateObject();
+    cJSON* permissions_array = cJSON_AddArrayToObject(permissions_obj, "permissions");
+    for (int i = 0; i < permissions_string_array.count; i++) {
+        cJSON_AddItemToArray(permissions_array, cJSON_CreateString(permissions_string_array.array[i]));
+    }
+
+    DeleteScratch(scratch);
+
+    return permissions_obj;
+}
+
+
+bool HTTP_Auth_CheckPermissionAllowedAtSessionID(char* session_id, char* permission) {
+    Temp scratch = GetScratch(0, 0);
+
+    StringArray permissions_array = HTTP_Auth_StringArray_GetPermissionsAtSessionID(scratch.arena, session_id);
+
+    for (int i = 0; i < permissions_array.count; i++) {
+        if (!strcmp(permissions_array.array[i], permission)) {
+            DeleteScratch(scratch);
+            return true;
+        }
+    }
+
+    DeleteScratch(scratch);
+    return false;
+}
+
+bool HTTP_Auth_DeletePermissionAtSessionID(char* session_id, char* permission) {
+    Temp scratch = GetScratch(0, 0);
+
+    StringArray permissions_array = HTTP_Auth_StringArray_GetPermissionsAtSessionID(scratch.arena, session_id);
+    if (!permissions_array.count) {
+        DeleteScratch(scratch);
+        return false;
+    }
+
+    StringArray removed_permissions_array = {
+        .array = PushArray(scratch.arena, char*, 64)
+    };
+
+    bool found_matches = false;
+    for (int i = 0; i < permissions_array.count; i++) {
+        if (!strcmp(permissions_array.array[i], permission)) {
+            found_matches = true;
+        }
+        else {
+            removed_permissions_array.array[removed_permissions_array.count] = permissions_array.array[i];
+            removed_permissions_array.count++;
+        }
+    }
+
+    if (found_matches) {
+        char* permission_string = ConvertStrArrayToString(scratch.arena, removed_permissions_array, ",");
+        char  query_string[1024] = {0};
+        sprintf(query_string, "UPDATE %s SET __Session_Permissions='%s' WHERE SessionID='%s';", session_auth.auth_table_name, permission_string, session_id);
+        if (HTTP_RunSQLQuery(query_string, false, false) == NULL) {
+            printf("[ERROR] HTTP_Auth_DeletePermissionAtSessionID() An error occured when running the SQL code to delete the permission at the Session ID.\n");
+        }
+    }
+
+    DeleteScratch(scratch);
+    return found_matches;
+}
+
+bool HTTP_Auth_AddPermissionAtSessionID(char* session_id, char* permission) {
+    Temp scratch = GetScratch(0, 0);
+
+    StringArray permissions_array = HTTP_Auth_StringArray_GetPermissionsAtSessionID(scratch.arena, session_id);
+    if (!permissions_array.count) {
+        DeleteScratch(scratch);
+        return false;
+    }
+
+    permissions_array.array[permissions_array.count] = permission;
+    permissions_array.count++;
+
+    char* permission_string = ConvertStrArrayToString(scratch.arena, permissions_array, ",");
+    char  query_string[1024] = {0};
+    sprintf(query_string, "UPDATE %s SET __Session_Permissions='%s' WHERE SessionID='%s';", session_auth.auth_table_name, permission_string, session_id);
+
+    if (HTTP_RunSQLQuery(query_string, false, false) == NULL) {
+        printf("[ERROR] HTTP_Auth_AddPermissionAtSessionID() An error occured when running the SQL code to add the permission at the Session ID.\n");
+        DeleteScratch(scratch);
+        return false;
+    }
+
+
+    DeleteScratch(scratch);
+    return true;
+}
+
+bool HTTP_Auth_SetPermissionsAtSessionID(char* session_id, StringArray permissions) {
+    if (!HTTP_Auth_CheckSessionIDExists(session_id)) {
+        return false;
+    }
+
+    Temp scratch = GetScratch(0, 0);
+
+    char* permission_string = ConvertStrArrayToString(scratch.arena, permissions, ",");
+    char  query_string[1024] = {0};
+    sprintf(query_string, "UPDATE %s SET __Session_Permissions='%s' WHERE SessionID='%s';", session_auth.auth_table_name, permission_string, session_id);
+
+    if (HTTP_RunSQLQuery(query_string, false, false) == NULL) {
+        printf("[ERROR] HTTP_Auth_SetPermissionsAtSessionID() An error occured when running the SQL code to set the new permissions at the Session ID.\n");
+        DeleteScratch(scratch);
+        return false;
+    }
+
+    DeleteScratch(scratch);
+    return true;
+}
+
+cJSON* HTTP_Auth_GetAllSessionID(bool remove_expired, bool list_response) {
+    Temp scratch = GetScratch(0, 0);
+
+    char query_string[1024] = {0};
+    if (remove_expired) {
+        sprintf(query_string, "SELECT SessionID FROM %s WHERE __Session_ExpiryDate > datetime('now');", session_auth.auth_table_name);
+    }
+    else {
+        sprintf(query_string, "SELECT SessionID FROM %s;", session_auth.auth_table_name);
+    }
+
+    printf("Getting all session id query string: `%s`\n", query_string);
+    cJSON* session_id_query_result = HTTP_RunSQLQuery(query_string, list_response, false);
+    if (session_id_query_result == NULL) {
+        printf("[ERROR] HTTP_Auth_GetAllSessionID() An error occured when running the SQL code to retreive all the Session ID's.\n");
+        DeleteScratch(scratch);
+        return NULL;
+    }
+
+    DeleteScratch(scratch);
+    return session_id_query_result; 
 }

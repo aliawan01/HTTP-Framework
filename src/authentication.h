@@ -58,11 +58,17 @@ bool   HTTP_Auth_RefreshTokenExpiryDate(char* check_session_id);
 cJSON* HTTP_Auth_GetUserDataAtSessionToken(char* session_id, bool remove_null_values, bool list_response, bool convert_types);
 cJSON* HTTP_Auth_GetLoginDataAtSessionToken(char* session_id, bool list_response, bool convert_types);
 cJSON* HTTP_Auth_GetLoginAndUserDataAtSessionToken(char* session_id, bool remove_null_values, bool list_response, bool convert_types);
-char*  HTTP_Auth_GetSessionIDAtLoginDetails(Arena* arena, cJSON* login_data);
+char*  HTTP_Auth_GetSessionIDAtLoginDetails(cJSON* login_data);
 char*  HTTP_Auth_SetLoginDataAtSessionToken(Arena* arena, char* session_id, cJSON* new_login_data);
 char*  HTTP_Auth_SetUserDataAtSessionToken(Arena* arena, char* session_id, cJSON* new_user_data);
 char*  HTTP_Auth_SetLoginAndUserDataAtSessionToken(Arena* arena, char* session_id, cJSON* new_data);
 bool   HTTP_Auth_ExpireSessionID(char* session_id);
+StringArray HTTP_Auth_StringArray_GetPermissionsAtSessionID(Arena* arena, char* session_id);
+cJSON* HTTP_Auth_cJSON_GetPermissionsAtSessionID(char* session_id);
+bool   HTTP_Auth_CheckPermissionAllowedAtSessionID(char* session_id, char* permission);
+bool   HTTP_Auth_DeletePermissionAtSessionID(char* session_id, char* permission);
+bool   HTTP_Auth_AddPermissionAtSessionID(char* session_id, char* permission);
+cJSON* HTTP_Auth_GetAllSessionID(bool remove_expired, bool list_response);
 
 char*  HTTP_Auth_CookiesDict_GenerateNewSessionTokenIfExpired(Arena* arena, CookiesDict cookies);
 void   HTTP_Auth_CookiesDict_DeleteUserAtSessionToken(CookiesDict cookies);

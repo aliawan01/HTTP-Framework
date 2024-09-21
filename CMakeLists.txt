@@ -15,10 +15,11 @@ find_library(CJSON_UTILS_LIB cjson_utils.lib PATHS ${PROJECT_SOURCE_DIR}/vendor)
 find_library(SQLITE_LIB sqlite3.lib PATHS ${PROJECT_SOURCE_DIR}/vendor)
 
 add_definitions(-DDEBUG_BUILD)
+add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 if (MSVC) 
     # Required to make the MAP macro work properly
     add_compile_options(/Zc:preprocessor)
-    add_compile_options(-fsanitize=address)
+    add_compile_options(-fsanitize=address) # # TODO: Remove after testing.
     add_link_options(/INCREMENTAL:no)
 endif()
 

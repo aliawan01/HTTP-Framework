@@ -145,8 +145,45 @@ char* DecodeURL(Arena* arena, char* url) {
         }
     }
 
+    // NOTE: Removing any trailing forward slashes.
+    if (decoded_url[strlen(decoded_url)-1] == '/') {
+        decoded_url[strlen(decoded_url)-1] = '\0';
+    }
+
 
     return decoded_url;
+}
+
+char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset) {
+	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
+	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
+	//		 iteration of the while loop.
+    Temp scratch = GetScratch(&arena, 1);
+	char* string_copy = HTTP_StringDup(scratch.arena, string);
+
+	char* front_ptr = string_copy+front_offset;
+	if (front_ptr[0] == ' ') {
+		for (; front_ptr[0] != ' '; front_ptr++);
+	}
+
+	while (front_ptr[0] == ' ') {
+		memmove(front_ptr, front_ptr+1, strlen(front_ptr+1)+1);
+	}
+
+	char* back_ptr = string_copy+strlen(string_copy)-back_offset-1;
+	if (back_ptr[0] == ' ') {
+		for (; back_ptr[0] != ' '; back_ptr--);
+	}
+
+	while (back_ptr[0] == ' ') {
+		memmove(back_ptr, back_ptr+1, strlen(back_ptr+1)+1);
+		back_ptr--;
+	}
+
+    char* return_string_copy = HTTP_StringDup(arena, string_copy);
+    DeleteScratch(scratch);
+
+	return return_string_copy;
 }
 
 Dict ParseHeaderIntoDict(Arena* arena, char* header_string) {
@@ -194,7 +231,7 @@ Dict ParseHeaderIntoDict(Arena* arena, char* header_string) {
 	};
 }
 
-Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string, char separator) {
+Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string, char separator, bool remove_extra_whitespace) {
 	char** key_array = PushArray(arena, char*, 200);
 	char** value_array = PushArray(arena, char*, 200);
 	int dict_index = 0;
@@ -208,13 +245,14 @@ Dict ParseURIKeyValuePairString(Arena* arena, char* uri_string, char separator) 
 			char original_char = uri_string[i];
 			uri_string[i] = 0;
 
+            char* string_to_push = remove_extra_whitespace ? RemoveWhitespaceFrontAndBack(arena, uri_string+original_i, 0, 0) : uri_string+original_i;
             if (on_key) {
                 on_key = false;
-                PushNewStringToDict(arena, key_array, dict_index, uri_string+original_i);
+                PushNewStringToDict(arena, key_array, dict_index, string_to_push);
             }
             else {
                 on_key = true;
-                PushNewStringToDict(arena, value_array, dict_index, uri_string+original_i);
+                PushNewStringToDict(arena, value_array, dict_index, string_to_push);
                 dict_index++;
             }
 
@@ -269,37 +307,73 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	};
 }
 
-char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset) {
-	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
-	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
-	//		 iteration of the while loop.
-    Temp scratch = GetScratch(&arena, 1);
-	char* string_copy = HTTP_StringDup(scratch.arena, string);
+// TODO: This can be made MUCH more efficient...
+StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separator) {
+    StringArray split_string = {
+        .array = PushArray(arena, char*, 100),
+        .count = 0
+    };
 
-	char* front_ptr = string_copy+front_offset;
-	if (front_ptr[0] == ' ') {
-		for (; front_ptr[0] != ' '; front_ptr++);
-	}
+    int prev_offset = 0;
+    bool contains_separator;
+    for (int i = 0; i < strlen(string); i++) {
+        contains_separator = false;
+        if (i+strlen(separator) < strlen(string)) {
+            char original_char = string[i+strlen(separator)];
+            string[i+strlen(separator)] = 0;
+            if (!strcmp(string+i, separator)) {
+                contains_separator = true;
+            }
 
-	while (front_ptr[0] == ' ') {
-		memmove(front_ptr, front_ptr+1, strlen(front_ptr+1)+1);
-	}
+            string[i+strlen(separator)] = original_char;
+        }
+        
+        if (contains_separator) {
+            char original_value = string[i];
+            string[i] = 0;
 
-	char* back_ptr = string_copy+strlen(string_copy)-back_offset-1;
-	if (back_ptr[0] == ' ') {
-		for (; back_ptr[0] != ' '; back_ptr--);
-	}
+            PushNewStringToStringArray(arena, split_string.array, split_string.count, string+prev_offset); 
+            split_string.count++;
 
-	while (back_ptr[0] == ' ') {
-		memmove(back_ptr, back_ptr+1, strlen(back_ptr+1)+1);
-		back_ptr--;
-	}
+            string[i] = original_value;
 
-    char* return_string_copy = HTTP_StringDup(arena, string_copy);
-    DeleteScratch(scratch);
+            i += strlen(separator);
+            prev_offset = i;
 
-	return return_string_copy;
+        }
+    }
+    
+    // NOTE: Getting the last element.
+    if (prev_offset < strlen(string)) {
+        int end_index = -1;
+        char original_char;
+        for (int i = prev_offset; i+strlen(separator) < strlen(string)+1; i++) {
+            original_char = string[i+strlen(separator)];
+            string[i+strlen(separator)] = 0;
+            if (!strcmp(string+i, separator)) {
+                end_index = i;
+                string[end_index] = 0;
+            }
+
+            string[i+strlen(separator)] = original_char;
+            if (end_index != -1) {
+                break;
+            }
+        }
+
+        PushNewStringToStringArray(arena, split_string.array, split_string.count, string+prev_offset);
+        split_string.count++;
+
+        if (end_index != -1) {
+            string[end_index] = separator[0];
+        }
+    }
+
+
+    printf("finaly: `%s`\n", string);
+    return split_string;
 }
+
 
 // TODO: Find a way to make a copy of the source string the scratch_arena, do work to replace
 //       duplicates there and then copy the string to the global_arena and then free the 

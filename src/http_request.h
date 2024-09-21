@@ -11,6 +11,7 @@
 typedef Dict HeaderDict;
 typedef Dict CookiesDict;
 
+// TODO: May not be using this and can just get rid of it.
 typedef struct HTTPGetRequest {
 	char* http_response_header;
 	char* data_to_send;
@@ -38,6 +39,8 @@ typedef struct {
     CookiesDict cookies;
     bool is_json_request;
     bool contains_query_string;
+    char* session_id;
+    char* user_permission;
 } HTTPRequestInfo;
 
 enum HTTPStatusCode {
@@ -82,6 +85,7 @@ typedef struct {
 typedef struct {
     char* method;
 	char* route;
+    StringArray permissions;
     bool is_regex_route;
     void (*response_func)(Arena*, HTTPRequestInfo*, HTTPResponse*);
 } HTTPRouteCallback;
@@ -93,7 +97,7 @@ global_variable char** search_dirs;
 global_variable int search_dirs_size;
 
 void   HTTP_Initialize(void);
-bool   HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
+bool   HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
 bool   HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
 bool   HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
 void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);

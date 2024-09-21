@@ -120,12 +120,12 @@ cJSON* HTTP_RunSQLQuery(char* sql_query, bool list_response, bool convert_types)
 
 void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
     Temp scratch = GetScratch(0, 0);
-    char* full_query = PushString(scratch.arena, 5024);
 
     cJSON* array = NULL;
     cJSON_ArrayForEach(array, json_obj) {
         if (!cJSON_IsArray(array)) {
-            printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON object with key: `%s` is not an object.\n", array->string);
+            printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON object with key: `%s` is not an array.\n", array->string);
+            DeleteScratch(scratch);
             return;
         }
 
@@ -133,51 +133,49 @@ void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
         cJSON_ArrayForEach(query_obj, array) {
             if (!cJSON_IsObject(query_obj)) {
                 printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is not an object.\n", query_obj->string);
+                DeleteScratch(scratch);
                 return;
             }
 
-            char* insert_into_statement = PushString(scratch.arena, 1024);
+            char* insert_into_statement = PushString(scratch.arena, 5024);
             char* values_statement = PushString(scratch.arena, 1024);
 
             sprintf(insert_into_statement, "INSERT INTO %s(", array->string);
             strcat(values_statement, "VALUES (");
 
             cJSON* query_obj_data = NULL;
+            bool first_object = false;
             cJSON_ArrayForEach(query_obj_data, query_obj) {
                 if (cJSON_IsObject(query_obj_data)) {
                     printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is an nested object which is not supported.\n", query_obj_data->string);
+                    DeleteScratch(scratch);
                     return;
                 }
-                
-                // TODO: What does this mean?
-                if (strcmp(query_obj_data->string, "UserID")) {
-                    strcat(insert_into_statement, query_obj_data->string);
-                    strcat(values_statement, cJSON_Print(query_obj_data));
 
-                    if (query_obj_data->next != NULL) {
-                        strcat(insert_into_statement, ",");
-                        strcat(values_statement, ",");
-                    }
-                    else {
-                        strcat(insert_into_statement, ")");
-                        strcat(values_statement, ");");
-                    }
+                if (!first_object) {
+                    first_object = true;
+                }
+                else {
+                    strcat(insert_into_statement, ", ");
+                    strcat(values_statement, ",");
                 }
 
+                strcat(insert_into_statement, query_obj_data->string);
+                strcat(values_statement, "'");
+                strcat(values_statement, HTTP_cJSON_GetStringValue(scratch.arena, query_obj_data));
+                strcat(values_statement, "'");
             }
 
-            // TODO: Perhaps remove the new lines if we are not allowing the user
-            //       to see the insert query?
-            strcat(full_query, insert_into_statement);
-            strcat(full_query, "\n");
-            strcat(full_query, values_statement);
-            strcat(full_query, "\n\n");
+            strcat(insert_into_statement, ") ");
+            strcat(values_statement, ");");
+            strcat(insert_into_statement, values_statement);
+
+            printf("[INFO] HTTP_InsertJSONIntoDatabase() full insert query: `%s`\n", insert_into_statement);
+            if (HTTP_RunSQLQuery(insert_into_statement, false, true) == NULL) {
+                printf("[ERROR] HTTP_InsertJSONIntoDatabase() An error occured when running the SQL code to insert JSON data into the database.");
+            }
         }
     }
-
-    // TODO: Perhaps remove this or give the user an option to specify if they want to use this?
-    printf("[INFO] HTTP_InsertJSONIntoDatabase() full insert query:\n%s\n", full_query);
-    HTTP_RunSQLQuery(full_query, false, true);
 
     DeleteScratch(scratch);
 }

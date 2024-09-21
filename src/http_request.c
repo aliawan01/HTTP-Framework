@@ -19,7 +19,7 @@ void HTTP_Initialize(void) {
 }
 
 
-bool HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
+bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
 	// Checking if the route is in the correct format.
 	if (route[0] != '/') {
 		printf("[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
@@ -30,7 +30,25 @@ bool HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*res
 	for (int index = 0; index < global_route_callback_index+1; index++) {
 		if (!strcmp(global_route_callback_array[index].route, route)) {
             if (!strcmp(global_route_callback_array[index].method, method)) {
-                printf("[INFO] HTTP_HandleRoute() overwrote callback function for method `%s` at route `%s`.\n", method, route);
+                bool contains_same_permissions = true;
+                if (permissions.count == global_route_callback_array[index].permissions.count) {
+                    for (int i = 0; i < permissions.count; i++) {
+                        if (strcmp(permissions.array[i], global_route_callback_array[index].permissions.array[i])) {
+                            contains_same_permissions = false;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    contains_same_permissions = false;
+                }
+
+                if (contains_same_permissions) {
+                    printf("[INFO] HTTP_HandleRoute() overwrote callback function for method `%s` at route `%s` with regex `%d` and with permissions `%s`.\n", method, route, is_regex_route, ConvertStrArrayToString(allocator.recycle_arena, permissions, ", "));
+                    global_route_callback_array[index].is_regex_route = is_regex_route;
+                    global_route_callback_array[index].response_func = response_func;
+                    return true;
+                }
             }
 		}
 	}
@@ -38,14 +56,25 @@ bool HTTP_HandleRoute(char* method, char* route, bool is_regex_route, void (*res
 	global_route_callback_index++;
     Assert(global_route_callback_index < INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE);
 
+    Assert(permissions.count < 20);
+    StringArray permissions_copy = {
+        .array = malloc(sizeof(char*)*20),
+        .count = permissions.count
+    };
+
+    for (int i = 0; i < permissions_copy.count; i++) {
+        permissions_copy.array[i] = strdup(permissions.array[i]);
+    }
+    
 	global_route_callback_array[global_route_callback_index] = (HTTPRouteCallback) {
+        .permissions = permissions_copy,
         .method = strdup(method),
 		.route = strdup(route),
         .is_regex_route = is_regex_route,
         .response_func = response_func,
 	};
 
-	printf("Added Route: %s, Method: %s, with response_func\n", global_route_callback_array[global_route_callback_index].route, global_route_callback_array[global_route_callback_index].method);
+	printf("Added Route: `%s`, Method: `%s`, Permissions: `%s` and with response_func\n", global_route_callback_array[global_route_callback_index].route, global_route_callback_array[global_route_callback_index].method, ConvertStrArrayToString(allocator.recycle_arena, global_route_callback_array[global_route_callback_index].permissions, ", "));
 	return true;
 }
 
@@ -74,6 +103,12 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
 
             free(global_route_callback_array[i].route);
             free(global_route_callback_array[i].method);
+
+            for (int x = 0; x < global_route_callback_array[i].permissions.count; x++) {
+                free(global_route_callback_array[i].permissions.array[x]);
+            }
+
+            free(global_route_callback_array[i].permissions.array);
 
             // Checking if there was only 1 element in global_route_callback_array.
             if (global_route_callback_index == 0) {
@@ -496,7 +531,7 @@ static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_bo
 	printf("[POST Request Data] %s\n", request_body);
     Temp scratch = GetScratch(0, 0);
 
-	Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_body, '&');
+	Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_body, '&', false);
 
     request_info->json_request_body = cJSON_CreateObject();
 	if (request_body[0] != 0) {
@@ -550,7 +585,7 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
         }
 
         // Extracting variables and values into key_value_pairs_array;
-        Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_info->query_string, '&');
+        Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_info->query_string, '&', false);
 
         // Replacing variables in the file contents buffer with their values
         for (int file_var_index = 0; file_var_index < original_file_vars_matches.count; file_var_index++) {
@@ -585,23 +620,19 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
         for (int i = 0; i < original_file_vars_matches.count; i++) {
             cJSON* elem = NULL;
             cJSON_ArrayForEach(elem, variables) {
+                if (cJSON_IsObject(elem)) {
+                    printf("[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains nested objects which is not supported, please pass in a single JSON object.\n");
+                    DeleteScratch(scratch);
+                    return;
+                }
+                else if (cJSON_IsArray(elem)) {
+                    printf("[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains an array which is not supported, please pass in a single JSON object.\n");
+                    DeleteScratch(scratch);
+                    return;
+                }
                 if (!strcmp(elem->string, trim_file_vars[i])) {
-                    // TODO: Make this use HTTP_cJSON_GetStringValue().
-                    char string_buf[256] = {0};
-                    char* string_val = cJSON_GetStringValue(elem);
-
-                    if (string_val == NULL) {
-                        double float_val = cJSON_GetNumberValue(elem);
-                        if (float_val - (int)float_val == 0) {
-                            sprintf(string_buf, "%d", (int)float_val);
-                        }
-                        else {
-                            sprintf(string_buf, "%f", float_val);
-                        }
-
-                    }
-
-                    *source_string = StrReplaceSubstringAllOccurance(arena, *source_string, original_file_vars_matches.array[i], string_val == NULL ? string_buf : string_val);
+                    char* string_buf = HTTP_cJSON_GetStringValue(scratch.arena, elem);
+                    *source_string = StrReplaceSubstringAllOccurance(arena, *source_string, original_file_vars_matches.array[i], string_buf);
                 }
             }
         }
@@ -614,7 +645,9 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
 
 String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path)  {
     String file_contents = HTTP_GetFileContents(arena, file_path);
-    HTTP_TemplateText(arena, request_info, variables, &file_contents);
+    if (file_contents.string) {
+        HTTP_TemplateText(arena, request_info, variables, &file_contents);
+    }
     return file_contents;
 }
 
@@ -814,7 +847,13 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
                     printf("------------------------------\n");
                     printf("GOT COOKIES!!!\n");
                     printf("------------------------------\n");
-                    request_info.cookies = ParseURIKeyValuePairString(allocator.recycle_arena, request_info.headers.values[index], ':');
+                    request_info.cookies = ParseURIKeyValuePairString(allocator.recycle_arena, request_info.headers.values[index], ';', true);
+                    for (int i = 0; i < request_info.cookies.count; i++) {
+                        if (!strcmp(request_info.cookies.keys[i], "SessionID")) {
+                            printf("--------- GOT SESSION ID!!! ---------\n");
+                            request_info.session_id = request_info.cookies.values[i];
+                        }
+                    }
                 }
 			}
 
@@ -828,28 +867,6 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
             else {
                 request_info.request_body = HTTP_StringDup(allocator.recycle_arena, receiving_buffer+index);
             }
-
-            /* bool created_new_entry = false; */
-            /* bool successfully_deleted_entry = false; */
-            /* if (!strcmp(request_info.request_method, "PUT")) { */
-            /*     created_new_entry = HTTP_ParsePUTRequest(&request_info, require_json_response); */
-            /* } */
-
-            /* if (!strcmp(request_info.request_method, "DELETE")) { */
-            /*     successfully_deleted_entry = HTTP_ParseDELETERequest(&request_info); */
-            /* } */
-            
-
-			/* HTTPGETRequest output = HTTP_ParseGETRequest(&request_info, require_json_response, created_new_entry, successfully_deleted_entry); */
-            /* HTTPResponse output = { .response_body_length = -1 }; */
-
-			/* if (!strcmp(request_info.request_method, "POST")) { */
-			/* 	HTTP_ParsePOSTRequest(allocator.permanent_arena, &request_info); */
-			/* } */
-
-            /* if (HTTP_Auth_SessionCheckIsEnabled()) { */
-            /*     HTTP_Auth_SessionUserAllowed(request_info.cookies); */
-            /* } */
 
             HTTPResponse output = {0};
             output.headers.keys = PushArray(allocator.recycle_arena, char*, 50);
@@ -868,23 +885,45 @@ int HTTP_RunServer(char* server_ip_address, char* server_port) {
                                               !strcmp(request_info.original_route, global_route_callback_array[i].route) &&
                                               !global_route_callback_array[i].is_regex_route;
 
-                    if (is_non_regex_match) {
-                        global_route_callback_array[i].response_func(allocator.recycle_arena, &request_info, &output);
-                        break;
-                    }
-                    else if (global_route_callback_array[i].is_regex_route) {
-                        printf("-----------------------------\n");
-                        printf("Got a regex route query.\n");
-                        printf("-----------------------------\n");
-                        match_id = re_match(global_route_callback_array[i].route, request_info.route_to_use, &match_length);
-                        if (match_id != -1) {
-                            global_route_callback_array[i].response_func(allocator.recycle_arena, &request_info, &output);
-                            break;
+                    bool is_regex_match = global_route_callback_array[i].is_regex_route &&
+                                          re_match(global_route_callback_array[i].route, request_info.route_to_use, &match_length) != -1;
+
+                    if (is_non_regex_match || is_regex_match) {
+                        // NOTE: Checking for a `global` permission first.
+                        for (int x = 0; x < global_route_callback_array[i].permissions.count; x++) {
+                            if (!strcmp(global_route_callback_array[i].permissions.array[x], "global")) {
+                                request_info.user_permission = "global";
+                                global_route_callback_array[i].response_func(allocator.recycle_arena, &request_info, &output);
+                                break;
+                            }
+                        }
+
+                        if (HTTP_Auth_SessionCheckIsEnabled()) {
+                            if (HTTP_Auth_CheckSessionIDExists(request_info.session_id)) {
+                                printf("An existing user was found at session id: `%s`\n", request_info.session_id);
+                                StringArray user_specific_permissions = HTTP_Auth_StringArray_GetPermissionsAtSessionID(allocator.recycle_arena, request_info.session_id);
+                                bool found_matching_permisison = false;
+
+                                for (int x = 0; x < user_specific_permissions.count && !found_matching_permisison; x++) {
+                                    for (int y = 0; y < global_route_callback_array[i].permissions.count; y++) {
+                                        if (!strcmp(global_route_callback_array[i].permissions.array[y], user_specific_permissions.array[x])) {
+                                            printf("----------------------------------\n");
+                                            printf("Found matching permission at: user_specific_permissions: `%s`, global_route_callback_array: `%s`\n", user_specific_permissions.array[x], global_route_callback_array[i].permissions.array[y]);
+                                            printf("----------------------------------\n");
+                                            request_info.user_permission = user_specific_permissions.array[x];
+                                            global_route_callback_array[i].response_func(allocator.recycle_arena, &request_info, &output);
+                                            found_matching_permisison = true;
+                                            break;
+                                        }
+                                    }
+                                }    
+
+                            }
+
                         }
                     }
                 }
             }
-
 
             
             bool invalid_response = false;
