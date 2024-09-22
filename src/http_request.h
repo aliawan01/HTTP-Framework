@@ -8,6 +8,8 @@
 #define MAX_HTTP_REQUEST_SIZE 2056
 #define INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE 1000
 
+#define HTTP_SetContentTypeHeader(type) HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", type)
+
 typedef Dict HeaderDict;
 typedef Dict CookiesDict;
 

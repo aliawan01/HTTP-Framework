@@ -7,9 +7,8 @@
 
 void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
     printf("second_page_handler: `%s`\n", request_info->user_permission); 
-    response->status_code = OK_200;
 
-    HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", "text/html");
+    HTTP_SetContentTypeHeader("text/html");
     cJSON* elem = NULL;
     cJSON_ArrayForEach(elem, HTTP_Auth_GetAllSessionID(true, false)) {
         printf("[second_page_handler] deleted user with session ID: `%s`\n", elem->valuestring);
@@ -21,7 +20,6 @@ void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPRespon
 }
 
 void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
-    response->status_code = OK_200;
     printf("root_page_handler: `%s`\n", request_info->user_permission); 
 
     if (!strcmp(request_info->request_method, "POST") && request_info->is_json_request) {
@@ -31,7 +29,7 @@ void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse
     }
 
     cJSON* result = HTTP_RunSQLQuery("SELECT DISTINCT fname, lname, pname FROM Info", false, true);
-    HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", "text/html");
+    HTTP_SetContentTypeHeader("text/html");
 
     /* HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Set-Cookie", "name=John"); */
     HTTP_AddCookieToCookieJar(arena, &response->cookie_jar, "good", "hello", -1, NULL, NULL, NULL, false, false);
@@ -53,9 +51,8 @@ void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse
 void login_form_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
     printf("login_form_handler: `%s`\n", request_info->user_permission); 
     printf("got into login form handler!");
-    response->status_code = OK_200;
 
-    HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", "text/html");
+    HTTP_SetContentTypeHeader("text/html");
 
     cJSON* user_details = cJSON_CreateObject();
     cJSON_AddStringToObject(user_details, "username", "Google");

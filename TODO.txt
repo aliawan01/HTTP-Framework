@@ -32,6 +32,9 @@
   ** Make the templating more advanced by implementing functionality like
        url_for() in Flask.
 
+  * Add more status codes to HTTPStatusCode and fill out the matching status
+    code strings in HTTP_StatusCodeStrings.
+
   * Go through the TODO's in the project.
   * Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
     (e.g. the SQL commands which are being executed).
