@@ -29,4 +29,3 @@ void  DeleteScratch(Temp temp_scratch);
 #define PushStruct(arena, type) (type*)ArenaAllocAligned(arena, 1, sizeof(type), _Alignof(type))
 
 // Resize Arena?
-

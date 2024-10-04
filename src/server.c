@@ -4,6 +4,7 @@
 #include "string_handling.h"
 #include "database.h"
 #include "authentication.h"
+#include "thread_pool.h"
 
 void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
     printf("second_page_handler: `%s`\n", request_info->user_permission); 
@@ -67,6 +68,40 @@ void login_form_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPRespons
 int main(void) {
 	HTTP_Initialize();
 
+    printf("sizeof(LPVOID): %zd\n", sizeof(LPVOID));
+    Arena my_arena;
+    ArenaInit(&my_arena, MB(10));
+
+
+    WorkQueue work_queue = HTTP_Thread_CreateWorkQueue(allocator.permanent_arena, 20);
+    HTTP_Thread_CreateThreadPool(allocator.permanent_arena, 5, &work_queue, MB(10), MB(10));
+
+    Work work = { "first" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "second" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "third" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "fourth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "fifth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "sixth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "seventh" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "eigth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "ninth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+    work = (Work) { "tenth" };
+    HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
+
+
+
+    while (1);
+
+#if 0
     HTTP_CreateDatabase("new.db");
 
 
@@ -115,6 +150,7 @@ int main(void) {
 
 	printf("\n");
 	HTTP_RunServer("127.0.0.1", "8000");
+#endif
 
 #if 0
 

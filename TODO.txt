@@ -1,6 +1,13 @@
 * PUT & DELETE requests
   * Support DELETE, PUT (basically update I think)
 
+  * Turn the work queue into a ring buffer.
+  * Make GetScratch() work in threads as well.
+
+  * Make GetScratch() work properly by retreiving ctx for each thread.
+  * Rethink how we include files/do stuff with initializing allocators,
+    threads and arenas.
+
 
   *** Support the `Connection: keep-alive` flag  by specifying the `Content-Length` flag (allows for multiple send() calls since the browser knows how much
      data will be sent) -> this will need multithreading to handle multiple clients.

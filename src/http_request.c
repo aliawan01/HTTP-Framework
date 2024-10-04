@@ -6,9 +6,11 @@
 
 void HTTP_Initialize(void) {
     // TODO: Perhaps allow the user to specify the size of the global and scratch arena.
-    ArenaInit(allocator.permanent_arena, MB(100));
+    ArenaInit(allocator.permanent_arena, MB(1024));
     ArenaInit(allocator.recycle_arena, MB(100));
     ArenaInit(allocator.route_callback_arena, MB(100));
+
+    ctx = BaseThread_CreateThreadContext(allocator.permanent_arena, 20*1024*1024, 10*1024*1024);
 
     for (int i = 0; i < ArrayCount(allocator.scratch_pool); i++) {
         ArenaInit(allocator.scratch_pool[i], MB(50));

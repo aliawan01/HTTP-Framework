@@ -29,6 +29,8 @@ static bool IsPowerOfTwo(uint64_t num) {
 #define MB(bytes) (uint64_t)bytes*1024*1024
 #define KB(bytes) (uint64_t)bytes*1024
 
+#include "base_thread.h"
+
 #define ArrayCount(array) sizeof(array)/sizeof(array[0])
 #define Maximum(a, b) (a > b) ? a : b
 #define Minimum(a, b) (a < b) ? a : b
@@ -55,6 +57,4 @@ typedef struct {
 // TODO: Maybe? make sure this a global_variable after testing.
 extern Allocator allocator;
 extern HTTPDatabase http_database;
-
-#define GetScratch(conflicting_arenas, num) ScratchGetFree(allocator.scratch_pool, allocator.scratch_arena_num, conflicting_arenas, num)
-
+extern ThreadContext ctx;

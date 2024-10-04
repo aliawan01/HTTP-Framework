@@ -16,6 +16,8 @@ Allocator allocator = {
 
 HTTPDatabase http_database = {0};
 
+ThreadContext ctx;
+
 char* ConvertStrArrayToString(Arena* arena, StringArray string_array, char* separator) {
     char* converted_string = PushString(arena, string_array.count*100);
 

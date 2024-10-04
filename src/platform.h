@@ -40,6 +40,8 @@
 #include <iphlpapi.h>
 #include <shellapi.h>
 #include <wincrypt.h>
+#include <processthreadsapi.h>
+#include <synchapi.h>
 
 #endif
 
