@@ -11,6 +11,9 @@
 #include <sqlite3.h>
 #include <cJSON.h>
 #include <cJSON_Utils.h>
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define bool int
 #define true 1

@@ -44,9 +44,6 @@ char* ConvertStrArrayToString(Arena* arena, StringArray string_array, char* sepa
 typedef struct {
     Arena* permanent_arena;
     Arena* route_callback_arena;
-    Arena* recycle_arena;
-    Arena* scratch_pool[2];
-    int    scratch_arena_num;
 } Allocator;
 
 typedef struct {
@@ -57,4 +54,4 @@ typedef struct {
 // TODO: Maybe? make sure this a global_variable after testing.
 extern Allocator allocator;
 extern HTTPDatabase http_database;
-extern ThreadContext ctx;
+extern _Thread_local ThreadContext ctx;

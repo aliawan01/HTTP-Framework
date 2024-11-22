@@ -92,4 +92,4 @@ bool   HTTP_Auth_CookiesDict_RefreshTokenExpiryDate(CookiesDict cookies);
         default               : VARIADIC_UNKNOWN      \
         ), (value)
 
-#define HTTP_Auth_AddUserIfNotExists(...) __HTTP_Auth_AddUserIfNotExists(allocator.recycle_arena, MAP_LIST(GetTypeVariadicArgs, ##__VA_ARGS__), VARIADIC_END)
+#define HTTP_Auth_AddUserIfNotExists(...) __HTTP_Auth_AddUserIfNotExists(ctx.recycle_arena, MAP_LIST(GetTypeVariadicArgs, ##__VA_ARGS__), VARIADIC_END)

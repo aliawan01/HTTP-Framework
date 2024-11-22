@@ -5,7 +5,7 @@
 #define MAX_HTTP_REQUEST_METHOD_SIZE 20
 #define MAX_HTTP_ROUTE_SIZE 512
 #define MAX_HTTP_QUERY_STRING_SIZE MAX_HTTP_ROUTE_SIZE
-#define MAX_HTTP_REQUEST_SIZE 2056
+#define MAX_HTTP_REQUEST_SIZE 5024
 #define INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE 1000
 
 #define HTTP_SetContentTypeHeader(type) HTTP_AddHeaderToHeaderDict(arena, &response->headers, "Content-Type", type)
@@ -17,7 +17,7 @@ typedef Dict CookiesDict;
 typedef struct HTTPGetRequest {
 	char* http_response_header;
 	char* data_to_send;
-	int data_to_send_length;
+	int   data_to_send_length;
 } HTTPGETRequest;
 
 typedef struct {
@@ -103,10 +103,12 @@ bool   HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool
 bool   HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
 bool   HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
 void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
-void   HTTP_Send404Page(SOCKET client_socket, char* route);
-int    HTTP_RunServer(char* server_ip_address, char* server_port);
+int    HTTP_Send404Page(SSL* ssl, char* route);
+int    HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_private_key);
 void   HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
 void   HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
 void   HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
 String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);
 char*  HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);
+// TODO: Maybe we can move this to a better place.
+void   CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl);

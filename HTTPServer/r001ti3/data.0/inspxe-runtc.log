@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<log version="1.0" tool="runtool">
+
+<msg id="1" tool="runtool">
+  <type>log-start</type>
+  <arg>2024/10/06 15:12:34</arg>
+</msg>
+<msg id="2" tool="runtool">
+  <type>collector-starts</type>
+</msg>
+<msg id="3" tool="runtool">
+  <type>marker-file</type>
+  <arg>C:\Dev\HTTP-Server\HTTPServer\r001ti3\r001ti3.inspxe</arg>
+</msg>
+<msg id="4" tool="tc">
+  <type>START</type>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:34 2024</timestamp>
+</msg>
+<msg id="5" tool="tc">
+  <type>EXEC_OF_INTEREST</type>
+  <arg>c:\dev\http-server\build\bin\httpserver.exe</arg>
+  <arg>26212</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:34 2024</timestamp>
+</msg>
+<msg id="6" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\dev\http-server\build\bin\httpserver.exe</arg>
+  <arg>0x7ff6dbc90000</arg>
+  <arg>0x7ff6dbceefff</arg>
+  <arg>2</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:34 2024</timestamp>
+</msg>
+<msg id="7" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\kernelbase.dll</arg>
+  <arg>0x7ffb0ff30000</arg>
+  <arg>0x7ffb1022cfff</arg>
+  <arg>3</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:34 2024</timestamp>
+</msg>
+<msg id="8" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\kernel32.dll</arg>
+  <arg>0x7ffb10bb0000</arg>
+  <arg>0x7ffb10c70fff</arg>
+  <arg>4</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:35 2024</timestamp>
+</msg>
+<msg id="9" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\ntdll.dll</arg>
+  <arg>0x7ffb126d0000</arg>
+  <arg>0x7ffb128c7fff</arg>
+  <arg>5</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:35 2024</timestamp>
+</msg>
+<msg id="10" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\ws2_32.dll</arg>
+  <arg>0x7ffb11f30000</arg>
+  <arg>0x7ffb11f9afff</arg>
+  <arg>6</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:35 2024</timestamp>
+</msg>
+<msg id="11" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\rpcrt4.dll</arg>
+  <arg>0x7ffb109f0000</arg>
+  <arg>0x7ffb10b12fff</arg>
+  <arg>7</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="12" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\dev\http-server\build\bin\sqlite3.dll</arg>
+  <arg>0x7ffa0b1b0000</arg>
+  <arg>0x7ffa0b4bffff</arg>
+  <arg>8</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="13" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\shell32.dll</arg>
+  <arg>0x7ffb10ef0000</arg>
+  <arg>0x7ffb1165efff</arg>
+  <arg>9</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="14" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\msvcp_win.dll</arg>
+  <arg>0x7ffb10440000</arg>
+  <arg>0x7ffb104dcfff</arg>
+  <arg>10</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="15" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\ucrtbase.dll</arg>
+  <arg>0x7ffb10340000</arg>
+  <arg>0x7ffb1043ffff</arg>
+  <arg>11</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="16" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\user32.dll</arg>
+  <arg>0x7ffb124f0000</arg>
+  <arg>0x7ffb1268cfff</arg>
+  <arg>12</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="17" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\win32u.dll</arg>
+  <arg>0x7ffb10230000</arg>
+  <arg>0x7ffb10251fff</arg>
+  <arg>13</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:36 2024</timestamp>
+</msg>
+<msg id="18" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\gdi32.dll</arg>
+  <arg>0x7ffb10b20000</arg>
+  <arg>0x7ffb10b4afff</arg>
+  <arg>14</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="19" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\gdi32full.dll</arg>
+  <arg>0x7ffb104e0000</arg>
+  <arg>0x7ffb105f6fff</arg>
+  <arg>15</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="20" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\vcruntime140d.dll</arg>
+  <arg>0x7ffa3aaa0000</arg>
+  <arg>0x7ffa3aacdfff</arg>
+  <arg>16</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="21" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\ucrtbased.dll</arg>
+  <arg>0x7ffa0af80000</arg>
+  <arg>0x7ffa0b1a0fff</arg>
+  <arg>17</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="22" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\vcruntime140_1d.dll</arg>
+  <arg>0x7ffb07510000</arg>
+  <arg>0x7ffb0751efff</arg>
+  <arg>18</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="23" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\program files\microsoft visual studio\2022\community\vc\tools\msvc\14.41.34120\bin\hostx64\x64\clang_rt.asan_dynamic-x86_64.dll</arg>
+  <arg>0x7ffa0a000000</arg>
+  <arg>0x7ffa0af7efff</arg>
+  <arg>19</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="24" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\advapi32.dll</arg>
+  <arg>0x7ffb10c80000</arg>
+  <arg>0x7ffb10d2ffff</arg>
+  <arg>20</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:37 2024</timestamp>
+</msg>
+<msg id="25" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\msvcrt.dll</arg>
+  <arg>0x7ffb117e0000</arg>
+  <arg>0x7ffb1187dfff</arg>
+  <arg>21</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="26" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\sechost.dll</arg>
+  <arg>0x7ffb11740000</arg>
+  <arg>0x7ffb117dffff</arg>
+  <arg>22</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="27" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\bcrypt.dll</arg>
+  <arg>0x7ffb10260000</arg>
+  <arg>0x7ffb10286fff</arg>
+  <arg>23</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="28" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\vcruntime140.dll</arg>
+  <arg>0x7ffaf7fe0000</arg>
+  <arg>0x7ffaf7ffdfff</arg>
+  <arg>24</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="29" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\vcruntime140_1.dll</arg>
+  <arg>0x7ffaf8030000</arg>
+  <arg>0x7ffaf803bfff</arg>
+  <arg>25</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="30" tool="tc">
+  <type>LOAD_MODULE</type>
+  <arg>c:\windows\system32\imm32.dll</arg>
+  <arg>0x7ffb10ec0000</arg>
+  <arg>0x7ffb10eeefff</arg>
+  <arg>26</arg>
+  <severity>INFO</severity>
+  <timestamp>Sun Oct  6 15:12:38 2024</timestamp>
+</msg>
+<msg id="31" tool="tc">
+  <type>INTERNAL</type>
+  <severity>ERROR</severity>
+  <timestamp>Sun Oct  6 15:12:40 2024</timestamp>
+</msg>
+<msg id="32" tool="runtool">
+  <type>app-exit-code</type>
+  <arg>-1073741819</arg>
+</msg>
+<msg id="33" tool="runtool">
+  <type>marker-file</type>
+  <arg>C:\Dev\HTTP-Server\HTTPServer\r001ti3\r001ti3.inspxe</arg>
+</msg>
+<msg id="34" tool="runtool">
+  <type>collector-done</type>
+</msg>
+<msg id="35" tool="runtool">
+  <type>log-end</type>
+  <arg>2024/10/06 15:12:44</arg>
+</msg>
+
+</log>
+

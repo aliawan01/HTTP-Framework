@@ -7,6 +7,7 @@
 
 ThreadContext BaseThread_CreateThreadContext(Arena* arena, uint64_t recycle_arena_size, uint64_t scratch_arena_size) {
     ThreadContext ctx = { .thread_id = thread_id_index };
+    printf("Created thread with thread_id: %d\n", thread_id_index);
 
     thread_id_index++;
     ctx.recycle_arena = PushStruct(arena, Arena);

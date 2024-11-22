@@ -1,6 +1,6 @@
 #pragma once
 
-static int  thread_id_index;
+static int thread_id_index;
 
 typedef struct {
     int thread_id;
