@@ -29,6 +29,8 @@ void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse
         HTTP_InsertJSONIntoDatabase(converted_array);
     }
 
+    HTTP_Set404Page("static/ginger.jpg");
+
     cJSON* result = HTTP_RunSQLQuery("SELECT DISTINCT fname, lname, pname FROM Info", false, true);
     HTTP_SetContentTypeHeader("text/html");
 
@@ -47,6 +49,7 @@ void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse
     response->response_body = HTTP_TemplateTextFromFile(arena, request_info, result, "static/first_page.html");
 
     HTTP_HandleRoute(StrArrayLit("global"), "GET", "/ooga", false, second_page_handler);
+    HTTP_DeleteRouteForAllMethod("/ooga", false);
 }
 
 void login_form_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
@@ -157,6 +160,10 @@ int main(void) {
         SSL_free(ssl);
     }
 #endif
+    if (sqlite3_threadsafe() == 0) {
+        printf("[ERROR] The version of sqlite3 you are is not thread safe, please try to recompile it with the following flag: `SQLITE_THREADSAFE=1`.\n");
+        return -1;
+    }
 
     HTTP_Initialize();
 
@@ -197,15 +204,17 @@ int main(void) {
     HTTP_HandleRoute(StrArrayLit("global"), "POST", "/good", true, root_page_handler);
     HTTP_HandleRoute(StrArrayLit("global"), "UPDATE", "/good", true, root_page_handler);
 
-    HTTP_HandleRoute(StrArrayLit("global"), "GET", "/something[0-9]+", false, second_page_handler);
-    HTTP_HandleRoute(StrArrayLit("global"), "GET", "/something[0-9]+", true, root_page_handler);
+    HTTP_HandleRoute(StrArrayLit("global"), "GET", "/som[0-9]*", true, second_page_handler);
+    HTTP_HandleRoute(StrArrayLit("global"), "GET", "/som[0-9]*", false, root_page_handler);
 
 
     HTTP_DeleteRouteForAllMethod("/good", true);
+    HTTP_Set404Page("static/error_page.html");
 
     /* HTTP_HandleRedirectRoute("GET", "/other main website", "/"); */
 
     printf("\n");
+
     HTTP_RunServer("8000", "vendor/certs/cert.pem", "vendor/certs/key.pem");
 
 #if 0

@@ -2,41 +2,20 @@
   * Support DELETE, PUT (basically update I think)
   * Turn the work queue into a ring buffer.
 
-  *** Make global_route_callback_array thread safe.
-      Could be useful: `https://learn.microsoft.com/en-us/windows/win32/sync/slim-reader-writer--srw--locks`
-
-  *** Make sure that sqlite3.dll is thread safe.
-     --> https://www.sqlite.org/threadsafe.html
-     * Test inserting data into the database from multiple threads.
+  *** Test it on linux to make sure that it works properly.
 
   *** Tell the user how to use mkcert to generate certificates in the tutorial.
-
 
   *** Perhaps find a way to have each request be handled by a thread, instead
       of each client being handled by a seperate thread, could be done through
       non-blocking sockets `BIO_set_nbio()`.
 
-  *** Create a macro for HTTP_Send404Page() to make sure that the user doesn't
-      have to face issues if the connection is closed or an error happens with
-      the connection.
-
-  *** Allow the user to send their own custom 404 page in HTTP_Send404Page().
-
   ** Find a way to add multiple seperate loopback devices to test the multithreading.
 
-  * Fix some issues of the issues with regex routes and non-regex routes,
-    when a regex route is specified to be the same as a non-regex route the
-    non-regex route is never recognized. 
-    e.g. 
-        HTTP_HandleRoute(StrArrayLit("global"), "GET", "/something[0-9]+", false, second_page_handler);
-        HTTP_HandleRoute(StrArrayLit("global"), "GET", "/something[0-9]+", true, root_page_handler);
-
-    /something[0-9]+ is never recognized.
+  * Test to make sure that global_route_callback_array is thread safe.
     
   * Rethink how we include files/do stuff with initializing allocators,
     threads and arenas.
-
-
 
 
 

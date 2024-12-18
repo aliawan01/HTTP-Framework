@@ -36,6 +36,8 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 		return false;
 	}
 
+    AcquireSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+
 	// Checking if the route already exists.
 	for (int index = 0; index < global_route_callback_index+1; index++) {
 		if (!strcmp(global_route_callback_array[index].route, route)) {
@@ -58,6 +60,7 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 
                     global_route_callback_array[index].is_regex_route = is_regex_route;
                     global_route_callback_array[index].response_func = response_func;
+                    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
                     return true;
                 }
             }
@@ -86,11 +89,15 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 	};
 
 	printf("Added Route: `%s`, Method: `%s`, Permissions: `%s` and with response_func\n", global_route_callback_array[global_route_callback_index].route, global_route_callback_array[global_route_callback_index].method, ConvertStrArrayToString(ctx.recycle_arena, global_route_callback_array[global_route_callback_index].permissions, ", "));
+    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+
 	return true;
 }
 
 
 static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool check_method) {
+    AcquireSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+
     bool successfully_deleted_route = false;
 
     for (int i = 0; i < global_route_callback_index+1; i ++) {
@@ -146,8 +153,8 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
         }
     }
 
+    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
     return successfully_deleted_route;
-
 }
 
 bool HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route) {
@@ -466,6 +473,7 @@ static void HTTP_ConvertFileExtensionToContentType(char* content_type, char* fil
 	}
 }
 
+// TODO: It isn't being used anywhere, what's it for? do we even need it?
 static char* HTTP_CreateResponseHeaderFromFile(Arena* arena, char* path_to_file, bool created_new_entry) {
 	// Extracting file type into a separate string.
 	char file_type[24] = {0};
@@ -475,26 +483,73 @@ static char* HTTP_CreateResponseHeaderFromFile(Arena* arena, char* path_to_file,
 	char content_type[100] = {0};
     HTTP_ConvertFileExtensionToContentType(content_type, file_type);
 
-    int status_code;
+    enum HTTPStatusCode status_code;
     if (created_new_entry) {
-        status_code = 201;
+        status_code = CREATED_201;
     }
     else {
-        status_code = 200;
+        status_code = OK_200;
     }
 
 	char* http_response_header = PushString(arena, 1024);
-	sprintf(http_response_header, "HTTP/1.1 %d OK\r\nContent-Type: %s\r\n\r\n", status_code, content_type);
+	sprintf(http_response_header, "HTTP/1.1 %s\r\nContent-Type: %s\r\n\r\n", HTTP_StatusCodeStrings[status_code], content_type);
 
 	return http_response_header;
 }
 
+// TODO: Think of a better way of sending 404 pages.
+bool HTTP_Set404Page(char* path_to_error_page) {
+    bool successfully_set_404_page = false;
+
+    AcquireSRWLockExclusive(&ctx.error_page_shared_mutex);
+    if (HTTP_FileExists(path_to_error_page)) {
+        // TODO: This will build up wasted memory in the long run think of a better way to do this.
+        path_to_404_page = HTTP_StringDup(allocator.permanent_arena, path_to_error_page);
+        successfully_set_404_page = true;
+    }
+
+    ReleaseSRWLockExclusive(&ctx.error_page_shared_mutex);
+    if (!successfully_set_404_page) {
+        printf("[ERROR] HTTP_Set404Page() No file exists at the path: `%s`.\n", path_to_error_page);
+    }
+
+    return successfully_set_404_page;
+}
+
 // TODO: Allow the user to send a custom 404 page.
-int HTTP_Send404Page(SSL* ssl, char* route) {
-	char* http_error_header = "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: 59\r\n\r\n<html><h1>404 couldn't find requested resource.</h1></html>";
-    int response = SSL_write(ssl, http_error_header, strlen(http_error_header));
-	printf("[SERVER] Sent 404 message for route: %s\n", route);
-    return response;
+static int Send404Page(SSL* ssl, char* route) {
+    AcquireSRWLockShared(&ctx.error_page_shared_mutex);
+    String file_contents = {0};
+    char* http_error_header = PushString(ctx.recycle_arena, 124+file_contents.count); 
+    int http_error_header_length;
+
+    if (path_to_404_page == 0) {
+        file_contents.string = "<html><h1>404</h1><p>The page you are looking for does not exist.</p>";
+        file_contents.count = strlen(file_contents.string);
+        sprintf(http_error_header, "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: %lld\r\n\r\n%s", file_contents.count, file_contents.string);
+        http_error_header_length = strlen(http_error_header);
+    }
+    else {
+        file_contents = HTTP_GetFileContents(ctx.recycle_arena, path_to_404_page);
+        char file_type[20] = {0};
+        char content_type[100] = {0};
+        HTTP_ExtractFileTypeFromFilePath(path_to_404_page, file_type);
+        HTTP_ConvertFileExtensionToContentType(content_type, file_type);
+
+        sprintf(http_error_header, "HTTP/1.1 404 Not Found\r\nContent-Type: %s\r\nContent-Length: %lld\r\n\r\n", content_type, file_contents.count);
+        http_error_header_length = strlen(http_error_header) + file_contents.count;
+        memcpy(http_error_header+strlen(http_error_header), file_contents.string, file_contents.count);
+
+        printf("[ERROR HEADER] `%s`\n", http_error_header);
+    }
+
+    ReleaseSRWLockShared(&ctx.error_page_shared_mutex);
+
+    printf("[SERVER] Sent 404 message for route: %s\n", route);
+
+    SSL_write(ssl, http_error_header, http_error_header_length);
+
+    return 0;
 }
 
 static void HTTP_ConvertContentTypeToFileExtension(char* content_type, char* file_extension) {
@@ -908,6 +963,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
         }
 
         HTTPResponse output = {0};
+        output.status_code = OK_200;
         output.headers.keys = PushArray(recycle_arena, char*, 50);
         output.headers.values = PushArray(recycle_arena, char*, 50);
 
@@ -915,6 +971,8 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
         output.cookie_jar.cookies = PushArray(recycle_arena, Cookie, 300);
 
         output.response_body.count = -1;
+
+        AcquireSRWLockShared(&ctx.global_route_callback_array_shared_mutex);
 
         int match_id = 0;
         int match_length = 0;
@@ -960,10 +1018,17 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
                         }
 
                     }
+                    break;
                 }
             }
         }
 
+        ReleaseSRWLockShared(&ctx.global_route_callback_array_shared_mutex);
+
+        if (output.status_code == NOT_FOUND_404) {
+            Send404Page(ssl, request_info.original_route);
+            goto reset_recycle_arena;
+        }
 
         bool invalid_response = false;
         if (output.response_body.count == -1 || output.response_body.string == NULL) {
@@ -981,7 +1046,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
 
             if (!contains_content_type_header) {
                 printf("[SERVER] No `Content-Type` header specified for response at route `%s`, sending 404 page.\n", request_info.route_to_use);
-                if (HTTP_Send404Page(ssl, request_info.original_route) <= 0) {
+                if (Send404Page(ssl, request_info.original_route) <= 0) {
                     break;
                 }
                 goto reset_recycle_arena;
@@ -1019,7 +1084,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
             }
 
             if (!found_match) {
-                if (HTTP_Send404Page(ssl, request_info.original_route) <= 0) {
+                if (Send404Page(ssl, request_info.original_route) <= 0) {
                     break;
                 }
                 goto reset_recycle_arena;

@@ -9,6 +9,9 @@ ThreadContext BaseThread_CreateThreadContext(Arena* arena, uint64_t recycle_aren
     ThreadContext ctx = { .thread_id = thread_id_index };
     printf("Created thread with thread_id: %d\n", thread_id_index);
 
+    InitializeSRWLock(&ctx.global_route_callback_array_shared_mutex);
+    InitializeSRWLock(&ctx.error_page_shared_mutex);
+    
     thread_id_index++;
     ctx.recycle_arena = PushStruct(arena, Arena);
     ArenaInit(ctx.recycle_arena, recycle_arena_size);
