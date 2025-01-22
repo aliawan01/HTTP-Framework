@@ -190,7 +190,7 @@ int main(void) {
 
     /* printf("%s\n", HTTP_CreateDateString(allocator.recycle_arena, StrLit("Mon"), 31, StrLit("Jun"), 2019, 7, 20, 27)); */
 
-    char* dirs[] = {"something_elsdafj", "static/", "../Web Server/static", "good", "C:/something", "C:/good_morning/ls", "C:\\Dev\\Real Work\\Web Server\\static\\"};
+    char* dirs[] = {"something_elsdafj", "static/", };
     HTTP_SetSearchDirectories(dirs, ArrayCount(dirs));
 
     HTTP_HandleRoute(StrArrayLit("global", "second"), "GET", "/", false, root_page_handler);
@@ -215,7 +215,11 @@ int main(void) {
 
     printf("\n");
 
-    HTTP_RunServer("8000", "vendor/certs/cert.pem", "vendor/certs/key.pem");
+    printf("==========================\n");
+    printf("Max session ID length: %d\n", SSL_MAX_SSL_SESSION_ID_LENGTH);
+    printf("==========================\n");
+    /* HTTP_RunServer("8000", "vendor/certs/cert.pem", "vendor/certs/key.pem"); */
+    HTTP_RunServer("8000", "linux_cert_temp/cert.pem", "linux_cert_temp/key.pem");
 
 #if 0
 

@@ -776,8 +776,8 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 
     SSL_CTX_set_options(context, SSL_OP_IGNORE_UNEXPECTED_EOF|SSL_OP_NO_RENEGOTIATION|SSL_OP_CIPHER_SERVER_PREFERENCE);
 
-    char ssl_cache[1024] = {0};
-    SSL_CTX_set_session_id_context(context, ssl_cache, ArrayCount(ssl_cache));
+    char ssl_cache[SSL_MAX_SSL_SESSION_ID_LENGTH] = {0};
+    SSL_CTX_set_session_id_context(context, ssl_cache, SSL_MAX_SSL_SESSION_ID_LENGTH);
     SSL_CTX_set_session_cache_mode(context, SSL_SESS_CACHE_SERVER);
     SSL_CTX_sess_set_cache_size(context, ArrayCount(ssl_cache));
     SSL_CTX_set_timeout(context, 3600); // NOTE: 1 hour timeout
@@ -833,6 +833,7 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 
         if (SSL_accept(ssl) <= 0) {
             printf("[ERROR] An error occured when performing the SSL handshake with the client.\n");
+            printf("[ERROR CODE] `%s`\n", ERR_error_string(ERR_get_error(), NULL));
             SSL_free(ssl);
             continue;
         }
