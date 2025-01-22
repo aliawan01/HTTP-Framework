@@ -4,7 +4,7 @@
 void ArenaInit(Arena* arena, uint64_t arena_size) {
     // TODO: Probably best to reserve the virtual address space first then
     //       commit pages as necessary.
-    arena->buffer = VirtualAlloc(0, arena_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+    arena->buffer = MemoryAlloc(arena_size);
     Assert(arena->buffer != NULL);
     arena->buffer_size = arena_size;
     arena->current_offset = 0;
@@ -46,7 +46,7 @@ void ArenaDealloc(Arena* arena) {
 }
 
 void ArenaDelete(Arena* arena) {
-    VirtualFree(arena->buffer, 0, MEM_RELEASE);
+    MemoryFree(arena->buffer, arena->buffer_size);
     arena->buffer_size = 0;
     arena->current_offset = 0;
 }

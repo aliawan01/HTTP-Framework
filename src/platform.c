@@ -1,6 +1,8 @@
 #include "platform.h"
 
-#ifdef _WIN32 
+/* #if SOMETHING */
+// TODO(ali): Remove this after making it work on linux.
+#ifdef _WIN32
 
 enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path) {
     if (file_path == NULL) { 
@@ -63,15 +65,69 @@ void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count) {
 
 }
 
+void ThreadReadWriteLock_Initialize(ThreadReadWriteLock* lock) {
+    InitializeSRWLock(lock);
+}
+
+void ThreadReadWriteLock_AcquireExclusiveLock(ThreadReadWriteLock* lock) {
+    AcquireSRWLockExclusive(lock);
+}
+
+void ThreadReadWriteLock_ReleaseExclusiveLock(ThreadReadWriteLock* lock) {
+    ReleaseSRWLockExclusive(lock);
+}
+
+void ThreadReadWriteLock_AcquireSharedLock(ThreadReadWriteLock* lock) {
+    AcquireSRWLockShared(lock);
+}
+
+void ThreadReadWriteLock_ReleaseSharedLock(ThreadReadWriteLock* lock) {
+    ReleaseSRWLockShared(lock);
+}
+
+void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int maxCount) {
+    *semaphore = CreateSemaphoreA(NULL, 0, count, NULL);
+}
+
+void ThreadSemaphore_Wait(ThreadSemaphore* semaphore) {
+    WaitForSingleObjectEx(*semaphore, INFINITE, FALSE);
+}
+
+bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore) {
+    if (ReleaseSemaphore(*semaphore, 1, NULL) != 0) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+void Thread_Create(Thread* thread, ThreadFunction function, void* args) {
+    *thread = CreateThread(NULL, 0, function, args, 0, NULL);
+}
+
+void* MemoryAlloc(int size) {
+    return VirtualAlloc(0, size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+}
+
+void  MemoryFree(void* buffer, int size) {
+    VirtualFree(buffer, 0, MEM_RELEASE);
+}
+
+bool AtomicCompareExchange(void* destination, void* compare, void* replace) {
+    return (InterlockedCompareExchangePointer((volatile void*)destination, replace, compare) == compare);
+}
 #else 
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include <errno.h>
 
-enum CreateDirStatus CreateDir(char* file_path) {
-    if (default_dir != NULL) {
-        if (mkdir(default_dir, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
+enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path) {
+    if (file_path != NULL) {
+        if (mkdir(file_path , S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
             switch (errno) {
                 case EEXIST:
                     return DIR_ALREADY_EXISTS;
@@ -93,5 +149,92 @@ enum CreateDirStatus CreateDir(char* file_path) {
     }
 }
 
+bool HTTP_DeleteDirRecursive(char* dir_name) {
+    DIR* directory = opendir(dir_name);
+    if (directory == NULL) {
+        return false;
+    }
 
+    closedir(directory);
+
+    char delete_directory_command[240] = {0};
+    sprintf(delete_directory_command, "rm -rf %s", dir_name);
+    system(delete_directory_command);
+
+    if ((directory = opendir(dir_name)) == NULL) {
+        return true;
+    }
+    else {
+        closedir(directory);
+        return false;
+    }
+}
+
+void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count) {
+    Assert(buffer_count > 255);
+
+    FILE* random_num_generator = fopen("/dev/urandom", "r");
+
+    int random_num;
+    for (int i = 0; i < 256; i += 4) {
+        fread(&random_num, sizeof(int), 1, random_num_generator);
+        snprintf(buffer+i, 5, "%d", abs(random_num));
+    }
+
+    fclose(random_num_generator);
+}
+
+
+void ThreadReadWriteLock_Initialize(ThreadReadWriteLock* lock) {
+    pthread_rwlock_init(lock, NULL);
+}
+
+void ThreadReadWriteLock_AcquireExclusiveLock(ThreadReadWriteLock* lock) {
+    pthread_rwlock_wrlock(lock);
+}
+
+void ThreadReadWriteLock_ReleaseExclusiveLock(ThreadReadWriteLock* lock) {
+    pthread_rwlock_unlock(lock);
+}
+
+void ThreadReadWriteLock_AcquireSharedLock(ThreadReadWriteLock* lock) {
+    pthread_rwlock_rdlock(lock);
+}
+
+void ThreadReadWriteLock_ReleaseSharedLock(ThreadReadWriteLock* lock) {
+    pthread_rwlock_unlock(lock);
+}
+
+void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int maxCount) {
+    sem_init(semaphore, 0, maxCount);
+}
+
+void ThreadSemaphore_Wait(ThreadSemaphore* semaphore) {
+    sem_wait(semaphore);
+}
+
+bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore) {
+    if (sem_post(semaphore) == 0) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+void Thread_Create(Thread* thread, ThreadFunction function, void* args) {
+    pthread_create(thread, NULL, function, args);
+}
+
+void* MemoryAlloc(int size) {
+    return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+}
+
+void MemoryFree(void* buffer, int size) {
+    munmap(buffer, size);
+}
+
+bool AtomicCompareExchange(void* destination, void* compare, void* replace) {
+    return __atomic_compare_exchange((volatile long*)destination, (long*)compare, (long*)replace, false, 0, 0);
+}
 #endif

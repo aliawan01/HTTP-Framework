@@ -36,7 +36,7 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 		return false;
 	}
 
-    AcquireSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+    ThreadReadWriteLock_AcquireExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
 
 	// Checking if the route already exists.
 	for (int index = 0; index < global_route_callback_index+1; index++) {
@@ -60,7 +60,7 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 
                     global_route_callback_array[index].is_regex_route = is_regex_route;
                     global_route_callback_array[index].response_func = response_func;
-                    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+                    ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
                     return true;
                 }
             }
@@ -89,14 +89,14 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
 	};
 
 	printf("Added Route: `%s`, Method: `%s`, Permissions: `%s` and with response_func\n", global_route_callback_array[global_route_callback_index].route, global_route_callback_array[global_route_callback_index].method, ConvertStrArrayToString(ctx.recycle_arena, global_route_callback_array[global_route_callback_index].permissions, ", "));
-    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+    ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
 
 	return true;
 }
 
 
 static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool check_method) {
-    AcquireSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+    ThreadReadWriteLock_AcquireExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
 
     bool successfully_deleted_route = false;
 
@@ -153,7 +153,7 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
         }
     }
 
-    ReleaseSRWLockExclusive(&ctx.global_route_callback_array_shared_mutex);
+    ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
     return successfully_deleted_route;
 }
 
@@ -501,14 +501,14 @@ static char* HTTP_CreateResponseHeaderFromFile(Arena* arena, char* path_to_file,
 bool HTTP_Set404Page(char* path_to_error_page) {
     bool successfully_set_404_page = false;
 
-    AcquireSRWLockExclusive(&ctx.error_page_shared_mutex);
+    ThreadReadWriteLock_AcquireExclusiveLock(&ctx.error_page_shared_mutex);
     if (HTTP_FileExists(path_to_error_page)) {
         // TODO: This will build up wasted memory in the long run think of a better way to do this.
         path_to_404_page = HTTP_StringDup(allocator.permanent_arena, path_to_error_page);
         successfully_set_404_page = true;
     }
 
-    ReleaseSRWLockExclusive(&ctx.error_page_shared_mutex);
+    ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.error_page_shared_mutex);
     if (!successfully_set_404_page) {
         printf("[ERROR] HTTP_Set404Page() No file exists at the path: `%s`.\n", path_to_error_page);
     }
@@ -518,7 +518,7 @@ bool HTTP_Set404Page(char* path_to_error_page) {
 
 // TODO: Allow the user to send a custom 404 page.
 static int Send404Page(SSL* ssl, char* route) {
-    AcquireSRWLockShared(&ctx.error_page_shared_mutex);
+    ThreadReadWriteLock_AcquireSharedLock(&ctx.error_page_shared_mutex);
     String file_contents = {0};
     char* http_error_header = PushString(ctx.recycle_arena, 124+file_contents.count); 
     int http_error_header_length;
@@ -543,7 +543,7 @@ static int Send404Page(SSL* ssl, char* route) {
         printf("[ERROR HEADER] `%s`\n", http_error_header);
     }
 
-    ReleaseSRWLockShared(&ctx.error_page_shared_mutex);
+    ThreadReadWriteLock_ReleaseSharedLock(&ctx.error_page_shared_mutex);
 
     printf("[SERVER] Sent 404 message for route: %s\n", route);
 
@@ -840,7 +840,6 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
         Work work = { ssl };
 
         HTTP_Thread_AddWorkToWorkQueue(&work_queue, work);
-
 	}
 
 	return 0;
@@ -972,7 +971,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
 
         output.response_body.count = -1;
 
-        AcquireSRWLockShared(&ctx.global_route_callback_array_shared_mutex);
+        ThreadReadWriteLock_AcquireSharedLock(&ctx.global_route_callback_array_shared_mutex);
 
         int match_id = 0;
         int match_length = 0;
@@ -1023,7 +1022,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
             }
         }
 
-        ReleaseSRWLockShared(&ctx.global_route_callback_array_shared_mutex);
+        ThreadReadWriteLock_ReleaseSharedLock(&ctx.global_route_callback_array_shared_mutex);
 
         if (output.status_code == NOT_FOUND_404) {
             Send404Page(ssl, request_info.original_route);

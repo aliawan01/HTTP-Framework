@@ -14,6 +14,8 @@
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <semaphore.h>
+#include <sys/mman.h>
 
 #define bool int
 #define true 1
@@ -23,7 +25,8 @@
 #define Assert(condition)\
     if (!(condition)) { \
         fprintf(stderr, "Assertion in file: %s at line %d\n", __FILE__, __LINE__); \
-        __debugbreak(); \
+        /* TODO(ali): Find a way to do this on linux */ \
+        /* __debugbreak();*/ \
     }           
 #else
 #define Assert(condition)
@@ -46,6 +49,20 @@
 #include <processthreadsapi.h>
 #include <synchapi.h>
 
+typedef SRWLOCK ThreadReadWriteLock;
+typedef HANDLE  ThreadSemaphore;
+typedef HANDLE  Thread;
+
+typedef DWORD WINAPI (*ThreadFunction)(LPVOID);
+typedef 
+#else
+// NOTE(ali): Linux master race.
+
+typedef pthread_rwlock_t ThreadReadWriteLock;
+typedef sem_t            ThreadSemaphore;
+typedef pthread_t        Thread;
+
+typedef void* (*ThreadFunction)(void*);
 #endif
 
 enum HTTPCreateDirStatus {
@@ -60,3 +77,20 @@ enum HTTPCreateDirStatus {
 enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path);
 bool HTTP_DeleteDirRecursive(char* dir_name);
 void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count);
+
+void Thread_Create(Thread* thread, ThreadFunction function, void* args);
+
+void ThreadReadWriteLock_Initialize(ThreadReadWriteLock* lock);
+void ThreadReadWriteLock_AcquireExclusiveLock(ThreadReadWriteLock* lock);
+void ThreadReadWriteLock_ReleaseExclusiveLock(ThreadReadWriteLock* lock);
+void ThreadReadWriteLock_AcquireSharedLock(ThreadReadWriteLock* lock);
+void ThreadReadWriteLock_ReleaseSharedLock(ThreadReadWriteLock* lock);
+
+void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int count);
+void ThreadSemaphore_Wait(ThreadSemaphore* semaphore);
+bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore);
+
+void* MemoryAlloc(int size);
+void  MemoryFree(void* buffer, int size);
+
+bool AtomicCompareExchange(void* destination, void* compare, void* replace);

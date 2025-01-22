@@ -16,12 +16,12 @@ typedef struct {
 } ThreadArgs;
 
 typedef struct {
-    HANDLE* threads;
+    Thread* threads;
     int thread_count;
     WorkQueue* work_queue;
 } ThreadPool;
 
-static HANDLE work_queue_semaphore;
+static ThreadSemaphore work_queue_semaphore;
 // TODO: Remove this after debugging.
 static ThreadContext* context_array;
 

@@ -2,7 +2,22 @@
   * Support DELETE, PUT (basically update I think)
   * Turn the work queue into a ring buffer.
 
+  * Find out why we can't load the web page when running it on linux.
+  * Test AtomicCompareExchange to make sure it works right because we 
+    probably messed it up.
+
+  * NOTE: Need to install `openssl` first then `libossl-dev` to get all
+          the dev libraries.
+          Same for sqlite3 `sqlite3` first then `libsqlite3-dev` to get all
+          the dev libraries.
+          Make a script for this for both windows and linux.
+
   *** Test it on linux to make sure that it works properly.
+        * Make the multithreading work on Linux.
+        * Will need to abstract the HANDLE and multithreading functions into 
+          the platform layer.
+
+        * Make the project build with all of the dependencies on Linux.
 
   *** Tell the user how to use mkcert to generate certificates in the tutorial.
 

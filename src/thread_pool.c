@@ -2,20 +2,26 @@
 #include "thread_pool.h"
 #include "http_request.h"
 
-
+// NOTE(ali): Not pretty I know, but it does the job for now.
+#if _WIN32
 static DWORD WINAPI CreateResponse(LPVOID arguments) {
+#else 
+static void* CreateResponse(void* arguments) {
+#endif
     ThreadArgs* args = (ThreadArgs*)arguments;
     ctx = args->ctx;
     WorkQueue* work_queue = args->work_queue;
 
     while (true) {
-        WaitForSingleObjectEx(work_queue_semaphore, INFINITE, FALSE);
+        ThreadSemaphore_Wait(&work_queue_semaphore);
 
         int current_count = work_queue->count; 
         int next_count = current_count - 1;
         Work work = work_queue->work[current_count];
 
-        if (InterlockedCompareExchange((volatile long*)&work_queue->count, next_count, current_count) == current_count) {
+        /* if (InterlockedCompareExchange((volatile long*)&work_queue->count, next_count, current_count) == current_count) { */
+        // TODO(ali): Check and test this it probably isn't correct.
+        if (AtomicCompareExchange(&work_queue->count, &current_count, &next_count)) {
             // NOTE: Making everything fresh for processing the new request.
             ArenaDealloc(ctx.recycle_arena);
             for (int i = 0; i < ArrayCount(ctx.scratch_pool); i++) {
@@ -24,18 +30,16 @@ static DWORD WINAPI CreateResponse(LPVOID arguments) {
 
             CreateHTTPResponseFunc(ctx, work.ssl);
         }
-
     }
-
 }
 
 // TODO: Need to move this to the platform layer?
 ThreadPool HTTP_Thread_CreateThreadPool(Arena* arena, int count, WorkQueue* work_queue, uint64_t recycle_arena_size, uint64_t scratch_arena_size) {
-    HANDLE* thread_array = PushArray(arena, HANDLE, count);
+    Thread* thread_array = PushArray(arena, Thread, count);
     ThreadArgs* args_array = PushArray(arena, ThreadArgs, count);
     context_array = PushArray(arena, ThreadContext, count);
 
-    work_queue_semaphore = CreateSemaphoreA(NULL, 0, 100000, NULL);
+    ThreadSemaphore_Init(&work_queue_semaphore, 100000);
 
     for (int i = 0; i < count; i++) {
         context_array[i] =  BaseThread_CreateThreadContext(arena, MB(20), MB(10));
@@ -49,7 +53,7 @@ ThreadPool HTTP_Thread_CreateThreadPool(Arena* arena, int count, WorkQueue* work
         args_array[i].ctx = context_array[i];
         args_array[i].work_queue = work_queue,
 
-        thread_array[i] = CreateThread(NULL, 0, CreateResponse, (void*)&args_array[i], 0, NULL);
+        Thread_Create(&thread_array[i], CreateResponse, (void*)&args_array[i]);
     }
 
     ThreadPool thread_pool = {
@@ -79,11 +83,8 @@ bool HTTP_Thread_AddWorkToWorkQueue(WorkQueue* work_queue, Work work) {
     work_queue->count++;
     work_queue->work[work_queue->count] = work;
 
-    if (work_queue_semaphore != 0) {
-        ReleaseSemaphore(work_queue_semaphore, 1, NULL);
-        return true;
-    }
-    else {
-        return false;
-    }
+    // TODO(ali): Check to make sure this is correct we were checking
+    //            if work_queue_semaphore != 0 before incrementing 
+    //            before (check commits).
+    return ThreadSemaphore_Increment(&work_queue_semaphore);
 }
