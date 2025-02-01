@@ -1,7 +1,7 @@
 #pragma once
 
-#include "platform.h"
-#include "arena.h"
+#include "http_platform.h"
+#include "http_arena.h"
 
 typedef struct {
     char* string;
@@ -17,7 +17,7 @@ static bool IsPowerOfTwo(uint64_t num) {
     return (num != 0) && (num & (num-1)) == 0;
 }
 
-#include "cjson_helper.h"
+#include "http_cjson_helper.h"
 
 // Macros
 #define internal static
@@ -52,6 +52,6 @@ typedef struct {
 } HTTPDatabase;
 
 // TODO: Maybe? make sure this a global_variable after testing.
-extern Allocator allocator;
-extern HTTPDatabase http_database;
-extern _Thread_local ThreadContext ctx;
+extern HTTPEXPORTFUNC Allocator allocator;
+extern HTTPEXPORTFUNC HTTPDatabase http_database;
+extern HTTPEXPORTFUNC _Thread_local ThreadContext ctx;

@@ -1,5 +1,5 @@
-#include "platform.h"
-#include "arena.h"
+#include "http_platform.h"
+#include "http_arena.h"
 #include "base_thread.h"
 
 #define ArrayCount(array) sizeof(array)/sizeof(array[0])

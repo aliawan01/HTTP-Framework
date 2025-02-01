@@ -1,7 +1,7 @@
-#include "util.h"
-#include "file_handling.h"
-#include "string_handling.h"
-#include "database.h"
+#include "http_util.h"
+#include "http_file_handling.h"
+#include "http_string_handling.h"
+#include "http_database.h"
 
 void HTTP_CreateDatabase(char* file_path) {
     http_database.initialized = true;

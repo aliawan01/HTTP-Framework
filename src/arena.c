@@ -1,5 +1,5 @@
-#include "util.h"
-#include "arena.h"
+#include "http_util.h"
+#include "http_arena.h"
 
 void ArenaInit(Arena* arena, uint64_t arena_size) {
     // TODO: Probably best to reserve the virtual address space first then

@@ -1,12 +1,37 @@
 * PUT & DELETE requests
-  * Support DELETE, PUT (basically update I think)
+  * Go through the TODO's in the project.
+  * Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
+    (e.g. the SQL commands which are being executed).
+
   * Turn the work queue into a ring buffer.
 
-  * Find out why we can't load the web page when running it on linux.
-  * Test AtomicCompareExchange to make sure it works right because we 
-    probably messed it up.
+  *** Find a way to generate a static and shared library for the HTTP Server 
+      library using CMake and in the server example either install it onto the
+      system or copy it into the same directory as where the executable is 
+      generated.
+      => Also change the name of the generated libraries using CMake.
 
-  * NOTE: Need to install `openssl` first then `libossl-dev` to get all
+  * Make an optional install script which will install libHTTPServerLib.so
+    or HTTPServerLib.dll into the system.
+
+  * Make some more examples e.g. how to run react on it.
+  * Will need to move sqlite3.h manually to vendor/include for Windows.
+  * Export only the symbols we need in the project through HTTPEXPORTFUNC 
+    (check to make sure that it works on Window as well).
+
+  ? Make a header file to contain all of the structs and functions the user 
+    needs (the functions should be the same as the ones being exported in the 
+    shared library).
+
+  * Test AtomicCompareExchange to make sure it works right because we 
+    probably messed it up. => Seems like it is working properly now.
+    => Check to make sure it works on Windows as well.
+
+  * NOTE: With mkcert run `mkcert update-ca-certificates` on ubuntu before
+          generating certificates also need to install `libnss3-tools`
+          before we call install mkcert.
+
+  * NOTE: Need to install `openssl` first then `libssl-dev` to get all
           the dev libraries.
           Same for sqlite3 `sqlite3` first then `libsqlite3-dev` to get all
           the dev libraries.
@@ -60,9 +85,6 @@
   * Add more status codes to HTTPStatusCode and fill out the matching status
     code strings in HTTP_StatusCodeStrings.
 
-  * Go through the TODO's in the project.
-  * Remove unnecessary `printf` in the project and unnecessary `[INFO]` messages 
-    (e.g. the SQL commands which are being executed).
 
   - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()
     functions from files which are text file (images and videos should not be allowed

@@ -6,6 +6,7 @@
 #include <stdalign.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdatomic.h>
 #include <time.h>
 #include <re.h>
 #include <sqlite3.h>
@@ -34,6 +35,11 @@
 #endif
 
 #ifdef _WIN32 
+#ifdef BUILD_LIB
+    #define HTTPEXPORTFUNC __declspec(dllexport)
+#else
+    #define HTTPEXPORTFUNC __declspec(dllimport)
+#endif
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -54,9 +60,13 @@ typedef HANDLE  ThreadSemaphore;
 typedef HANDLE  Thread;
 
 typedef DWORD WINAPI (*ThreadFunction)(LPVOID);
-typedef 
 #else
 // NOTE(ali): Linux master race.
+#ifdef BUILD_LIB
+    #define HTTPEXPORTFUNC __attribute__((visibility("default")))
+#else
+    #define HTTPEXPORTFUNC
+#endif
 
 typedef pthread_rwlock_t ThreadReadWriteLock;
 typedef sem_t            ThreadSemaphore;
@@ -74,9 +84,9 @@ enum HTTPCreateDirStatus {
 };
 
 // Platform Specific Functions
-enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path);
-bool HTTP_DeleteDirRecursive(char* dir_name);
-void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count);
+HTTPEXPORTFUNC enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path);
+HTTPEXPORTFUNC bool HTTP_DeleteDirRecursive(char* dir_name);
+HTTPEXPORTFUNC void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count);
 
 void Thread_Create(Thread* thread, ThreadFunction function, void* args);
 
@@ -93,4 +103,4 @@ bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore);
 void* MemoryAlloc(int size);
 void  MemoryFree(void* buffer, int size);
 
-bool AtomicCompareExchange(void* destination, void* compare, void* replace);
+bool AtomicCompareExchange(void* destination, void* compare, int replace);

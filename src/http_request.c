@@ -1,8 +1,8 @@
-#include "util.h"
-#include "string_handling.h"
+#include "http_util.h"
+#include "http_string_handling.h"
 #include "http_request.h"
-#include "file_handling.h"
-#include "authentication.h"
+#include "http_file_handling.h"
+#include "http_authentication.h"
 #include "thread_pool.h"
 
 void* Arena_cJSONMalloc(size_t size) {
@@ -820,6 +820,7 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 
         BIO* client_bio = BIO_pop(client_socket);
         printf("[INFO] New client accepted.\n");
+	    printf("===================================\nGot a new client.\n===========================================\n");
 
         SSL* ssl = SSL_new(context);
         if (ssl == NULL) {
@@ -862,12 +863,12 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
     Arena* recycle_arena = ctx.recycle_arena;
     char* receiving_buffer = PushString(recycle_arena, MAX_HTTP_REQUEST_SIZE);
 
-    while (SSL_read(ssl, receiving_buffer, 5024) > 0) {
+    while (SSL_read(ssl, receiving_buffer, MAX_HTTP_REQUEST_SIZE) > 0) {
         printf("[SERVER] Got request receiving buffer: `%s`\n", receiving_buffer);
         /* printf("[SERVER] Bytes received: %d\n", init_result); */
         printf("[SERVER] Data Received: %s\n", receiving_buffer);
 
-        // Parsing HTTP Requset
+        // Parsing HTTP Request
         HTTPRequestInfo request_info = { 
             .contains_query_string = false,
             .is_json_request = false

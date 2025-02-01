@@ -1,9 +1,9 @@
-#include "util.h"
-#include "file_handling.h"
-#include "string_handling.h"
+#include "http_util.h"
+#include "http_file_handling.h"
+#include "http_string_handling.h"
 #include "http_request.h"
-#include "database.h"
-#include "authentication.h"
+#include "http_database.h"
+#include "http_authentication.h"
 
 void HTTP_Auth_SessionEnable(char* auth_table_name,
                              StringArray login_data,

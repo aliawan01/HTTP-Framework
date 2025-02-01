@@ -1,4 +1,4 @@
-#include "platform.h"
+#include "http_platform.h"
 
 /* #if SOMETHING */
 // TODO(ali): Remove this after making it work on linux.
@@ -114,8 +114,8 @@ void  MemoryFree(void* buffer, int size) {
     VirtualFree(buffer, 0, MEM_RELEASE);
 }
 
-bool AtomicCompareExchange(void* destination, void* compare, void* replace) {
-    return (InterlockedCompareExchangePointer((volatile void*)destination, replace, compare) == compare);
+bool AtomicCompareExchange(void* destination, void* compare, int replace) {
+    return (InterlockedCompareExchange((volatile void*)destination, replace, *(long*)compare) == compare);
 }
 #else 
 
@@ -206,7 +206,7 @@ void ThreadReadWriteLock_ReleaseSharedLock(ThreadReadWriteLock* lock) {
 }
 
 void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int maxCount) {
-    sem_init(semaphore, 0, maxCount);
+    sem_init(semaphore, 0, 0);
 }
 
 void ThreadSemaphore_Wait(ThreadSemaphore* semaphore) {
@@ -214,12 +214,7 @@ void ThreadSemaphore_Wait(ThreadSemaphore* semaphore) {
 }
 
 bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore) {
-    if (sem_post(semaphore) == 0) {
-        return true;
-    }
-    else {
-        return false;
-    }
+    return sem_post(semaphore) == 0 ? true : false;
 }
 
 void Thread_Create(Thread* thread, ThreadFunction function, void* args) {
@@ -234,7 +229,7 @@ void MemoryFree(void* buffer, int size) {
     munmap(buffer, size);
 }
 
-bool AtomicCompareExchange(void* destination, void* compare, void* replace) {
-    return __atomic_compare_exchange((volatile long*)destination, (long*)compare, (long*)replace, false, 0, 0);
+bool AtomicCompareExchange(void* destination, void* compare, int replace) {
+    return atomic_compare_exchange_strong((volatile int*)destination, (int*)compare, replace);
 }
 #endif

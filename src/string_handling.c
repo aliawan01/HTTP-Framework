@@ -1,5 +1,5 @@
-#include "util.h"
-#include "string_handling.h"
+#include "http_util.h"
+#include "http_string_handling.h"
 
 bool ContainsWhitespace(char* string) {
     for (int i = 0; i < strlen(string); i++) {
@@ -98,9 +98,10 @@ char* DecodeURL(Arena* arena, char* url) {
             else if (!strcmp(escape_code, "5D")) {
                 escape_character = ']';
             }
-            else if (!strcmp(escape_code, "60")) {
-                escape_character = '‘';
-            }
+        	// TODO(ali): Add this back in once it works on linux.
+            // else if (!strcmp(escape_code, "60")) {
+            //     escape_character = '‘';
+            // }
             else if (!strcmp(escape_code, "3B")) {
                 escape_character = ';';
             }

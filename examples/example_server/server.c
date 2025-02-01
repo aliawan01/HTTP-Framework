@@ -1,9 +1,9 @@
-#include "util.h"
+#include "http_util.h"
 #include "http_request.h"
-#include "file_handling.h"
-#include "string_handling.h"
-#include "database.h"
-#include "authentication.h"
+#include "http_file_handling.h"
+#include "http_string_handling.h"
+#include "http_database.h"
+#include "http_authentication.h"
 #include "thread_pool.h"
 
 void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
@@ -168,6 +168,7 @@ int main(void) {
     HTTP_Initialize();
 
     HTTP_CreateDatabase("new.db");
+    HTTP_RunSQLQuery("CREATE TABLE IF NOT EXISTS Info(fname TEXT, lname TEXT, pname TEXT, custom TEXT, name TEXT, surname TEXT)", false, false);
 
     SessionMaxTimeout timeout = {
         .years = 10,
@@ -218,8 +219,7 @@ int main(void) {
     printf("==========================\n");
     printf("Max session ID length: %d\n", SSL_MAX_SSL_SESSION_ID_LENGTH);
     printf("==========================\n");
-    /* HTTP_RunServer("8000", "vendor/certs/cert.pem", "vendor/certs/key.pem"); */
-    HTTP_RunServer("8000", "linux_cert_temp/cert.pem", "linux_cert_temp/key.pem");
+    HTTP_RunServer("8000", "vendor/certs/cert.pem", "vendor/certs/key.pem");
 
 #if 0
 

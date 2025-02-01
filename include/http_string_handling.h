@@ -22,4 +22,4 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern);
 StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separator);
 char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset);
 char* StrReplaceSubstringAllOccurance(Arena* arena, char* source, char* substring, char* replace);
-char* HTTP_StringDup(Arena* arena, char* source);
+HTTPEXPORTFUNC char* HTTP_StringDup(Arena* arena, char* source);

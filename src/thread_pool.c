@@ -1,5 +1,7 @@
-#include "util.h"
+#include "http_util.h"
 #include "thread_pool.h"
+
+
 #include "http_request.h"
 
 // NOTE(ali): Not pretty I know, but it does the job for now.
@@ -19,9 +21,9 @@ static void* CreateResponse(void* arguments) {
         int next_count = current_count - 1;
         Work work = work_queue->work[current_count];
 
+        // TODO(ali): Remove InterlockedCompareExchange after we have abstracted it into AtomicCompareExchange MACRO!!! -> Must be a macro.
         /* if (InterlockedCompareExchange((volatile long*)&work_queue->count, next_count, current_count) == current_count) { */
-        // TODO(ali): Check and test this it probably isn't correct.
-        if (AtomicCompareExchange(&work_queue->count, &current_count, &next_count)) {
+        if (AtomicCompareExchange(&work_queue->count, &current_count, next_count)) {
             // NOTE: Making everything fresh for processing the new request.
             ArenaDealloc(ctx.recycle_arena);
             for (int i = 0; i < ArrayCount(ctx.scratch_pool); i++) {
@@ -39,7 +41,7 @@ ThreadPool HTTP_Thread_CreateThreadPool(Arena* arena, int count, WorkQueue* work
     ThreadArgs* args_array = PushArray(arena, ThreadArgs, count);
     context_array = PushArray(arena, ThreadContext, count);
 
-    ThreadSemaphore_Init(&work_queue_semaphore, 100000);
+    ThreadSemaphore_Init(&work_queue_semaphore, 100);
 
     for (int i = 0; i < count; i++) {
         context_array[i] =  BaseThread_CreateThreadContext(arena, MB(20), MB(10));
@@ -86,5 +88,6 @@ bool HTTP_Thread_AddWorkToWorkQueue(WorkQueue* work_queue, Work work) {
     // TODO(ali): Check to make sure this is correct we were checking
     //            if work_queue_semaphore != 0 before incrementing 
     //            before (check commits).
+    printf("=========================\nAdded work to the work queue.\n=====================\n");
     return ThreadSemaphore_Increment(&work_queue_semaphore);
 }

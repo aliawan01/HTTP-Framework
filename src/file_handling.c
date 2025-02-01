@@ -1,5 +1,5 @@
-#include "util.h"
-#include "file_handling.h"
+#include "http_util.h"
+#include "http_file_handling.h"
 
 bool HTTP_FileExists(char* file_name) {
     FILE* file = fopen(file_name, "rb");

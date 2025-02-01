@@ -1,6 +1,6 @@
 #pragma once
 
-#include "string_handling.h"
+#include "http_string_handling.h"
 
 #define MAX_HTTP_REQUEST_METHOD_SIZE 20
 #define MAX_HTTP_ROUTE_SIZE 512
@@ -216,17 +216,17 @@ global_variable char* path_to_404_page;
 global_variable char** search_dirs;
 global_variable int search_dirs_size;
 
-void   HTTP_Initialize(void);
-bool   HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
-bool   HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
-bool   HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
-void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
-bool   HTTP_Set404Page(char* path_to_error_page);
-int    HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_private_key);
-void   HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
-void   HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
-void   HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
-String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);
-char*  HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);
+HTTPEXPORTFUNC void   HTTP_Initialize(void);
+HTTPEXPORTFUNC bool   HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
+HTTPEXPORTFUNC bool   HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
+HTTPEXPORTFUNC bool   HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
+HTTPEXPORTFUNC void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
+HTTPEXPORTFUNC bool   HTTP_Set404Page(char* path_to_error_page);
+HTTPEXPORTFUNC int    HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_private_key);
+HTTPEXPORTFUNC void   HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
+HTTPEXPORTFUNC void   HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
+HTTPEXPORTFUNC void   HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
+HTTPEXPORTFUNC String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);
+HTTPEXPORTFUNC char*  HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);
 // TODO: Maybe we can move this to a better place.
 void   CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl);
