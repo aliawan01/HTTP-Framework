@@ -5,23 +5,17 @@
 
   * Turn the work queue into a ring buffer.
 
-  *** Find a way to generate a static and shared library for the HTTP Server 
-      library using CMake and in the server example either install it onto the
-      system or copy it into the same directory as where the executable is 
-      generated.
-      => Also change the name of the generated libraries using CMake.
+  * Make the functionality of checking if the library is installed onto the system
+    before trying to copy it into the binary directory work on Linux (look how we did
+    it on the Windows scripts it should be similar).
 
-  * Make an optional install script which will install libHTTPServerLib.so
-    or HTTPServerLib.dll into the system.
+  * Check if the the shared libraries are installed on the system first and use
+    them if they are otherwise copy them into the binary directory.
 
   * Make some more examples e.g. how to run react on it.
-  * Will need to move sqlite3.h manually to vendor/include for Windows.
-  * Export only the symbols we need in the project through HTTPEXPORTFUNC 
-    (check to make sure that it works on Window as well).
 
-  ? Make a header file to contain all of the structs and functions the user 
-    needs (the functions should be the same as the ones being exported in the 
-    shared library).
+  * Make a lexer to generate documentation for the project.
+
 
   * Test AtomicCompareExchange to make sure it works right because we 
     probably messed it up. => Seems like it is working properly now.

@@ -6,4 +6,4 @@ compile_commands.json
 new.db
 debug_symbols/
 src/cJSON.c
-vendor/*
+vendor/

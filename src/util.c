@@ -25,3 +25,7 @@ char* ConvertStrArrayToString(Arena* arena, StringArray string_array, char* sepa
 
     return converted_string;
 }
+
+ThreadContext HTTP_Thread_GetContext(void) {
+    return ctx;
+}

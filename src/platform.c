@@ -86,7 +86,7 @@ void ThreadReadWriteLock_ReleaseSharedLock(ThreadReadWriteLock* lock) {
 }
 
 void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int maxCount) {
-    *semaphore = CreateSemaphoreA(NULL, 0, count, NULL);
+    *semaphore = CreateSemaphoreA(NULL, 0, maxCount, NULL);
 }
 
 void ThreadSemaphore_Wait(ThreadSemaphore* semaphore) {
@@ -115,7 +115,7 @@ void  MemoryFree(void* buffer, int size) {
 }
 
 bool AtomicCompareExchange(void* destination, void* compare, int replace) {
-    return (InterlockedCompareExchange((volatile void*)destination, replace, *(long*)compare) == compare);
+    return (InterlockedCompareExchange((volatile void*)destination, replace, *(long*)compare) == *(long*)compare);
 }
 #else 
 
