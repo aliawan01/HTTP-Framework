@@ -7,3 +7,9 @@ new.db
 debug_symbols/
 src/cJSON.c
 vendor/
+
+example/example_server/include/
+example/example_server/vendor/
+example/example_server/static/
+example/example_server/build/
+example/example_server/*.db
