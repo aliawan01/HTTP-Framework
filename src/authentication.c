@@ -22,9 +22,6 @@ void HTTP_Auth_SessionEnable(char* auth_table_name,
         return;
     }
 
-    // TODO: Remove this after testing.
-    HTTP_RunSQLQuery("DROP TABLE SessionAuthTable;", false, false);
-    
     char check_table_exists_query[256] = {0};
     sprintf(check_table_exists_query, "SELECT name FROM sqlite_master WHERE type='table' AND name='{%s}'", auth_table_name);
     cJSON* table_already_exists = HTTP_RunSQLQuery(check_table_exists_query, false, false);
