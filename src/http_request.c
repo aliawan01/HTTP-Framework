@@ -6,7 +6,6 @@
 #include "thread_pool.h"
 
 void* Arena_cJSONMalloc(size_t size) {
-    printf("\tArena_cJSONMalloc: ctx.thread_id: %d\n", ctx.thread_id);
     return ArenaAllocAligned(ctx.recycle_arena, size, sizeof(char), sizeof(void*));
 }
 
@@ -15,7 +14,7 @@ void Arena_cJSONFree(void* object) {
 }
 
 void HTTP_Initialize(void) {
-    // TODO: Perhaps allow the user to specify the size of the global and scratch arena.
+    // TODO(ali): Perhaps allow the user to specify the size of the global and scratch arena.
     ArenaInit(allocator.permanent_arena, MB(1024));
     ArenaInit(allocator.route_callback_arena, MB(100));
 
@@ -30,15 +29,15 @@ void HTTP_Initialize(void) {
 
 
 bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*)) {
-	// Checking if the route is in the correct format.
+	// NOTE(ali): Checking if the route is in the correct format.
 	if (route[0] != '/') {
-		printf("[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
+		HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_HandleRoute() route given: `%s` is not in the correct format.\n", route);
 		return false;
 	}
 
     ThreadReadWriteLock_AcquireExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
 
-	// Checking if the route already exists.
+	// NOTE(ali): Checking if the route already exists.
 	for (int index = 0; index < global_route_callback_index+1; index++) {
 		if (!strcmp(global_route_callback_array[index].route, route)) {
             if (!strcmp(global_route_callback_array[index].method, method)) {
@@ -56,7 +55,7 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
                 }
 
                 if (contains_same_permissions) {
-                    printf("[INFO] HTTP_HandleRoute() overwrote callback function for method `%s` at route `%s` with regex `%d` and with permissions `%s`.\n", method, route, is_regex_route, ConvertStrArrayToString(ctx.recycle_arena, permissions, ", "));
+                    HTTP_Log(HTTP_INFO, "[INFO] HTTP_HandleRoute() overwrote callback function for method `%s` at route `%s` with regex `%d` and with permissions `%s`.\n", method, route, is_regex_route, ConvertStrArrayToString(ctx.recycle_arena, permissions, ", "));
 
                     global_route_callback_array[index].is_regex_route = is_regex_route;
                     global_route_callback_array[index].response_func = response_func;
@@ -88,7 +87,6 @@ bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool i
         .response_func = response_func,
 	};
 
-	printf("Added Route: `%s`, Method: `%s`, Permissions: `%s` and with response_func\n", global_route_callback_array[global_route_callback_index].route, global_route_callback_array[global_route_callback_index].method, ConvertStrArrayToString(ctx.recycle_arena, global_route_callback_array[global_route_callback_index].permissions, ", "));
     ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.global_route_callback_array_shared_mutex);
 
 	return true;
@@ -113,10 +111,10 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
             successfully_deleted_route = true;
 
             if (check_method) {
-                printf("[INFO] HTTP_DeletRouteForMethod() Deleted route for: `%s` with method: `%s`, contains regex: %d at index: %d\n", route, method, is_regex_route, i);
+                HTTP_Log(HTTP_INFO, "[INFO] HTTP_DeleteRouteForMethod() Deleted route for: `%s` with method: `%s`, contains regex: %d.\n", route, method, is_regex_route);
             }
             else {
-                printf("[INFO] HTTP_DeleteRouteAllMethod() Deleted route for: `%s` with method: `%s`, contains regex: %d at index: %d\n", route, global_route_callback_array[i].method, is_regex_route, i);
+                HTTP_Log(HTTP_INFO, "[INFO] HTTP_DeleteRouteAllMethod() Deleted route for: `%s` with method: `%s`, contains regex: %d.\n", route, global_route_callback_array[i].method, is_regex_route);
             }
 
             free(global_route_callback_array[i].route);
@@ -135,9 +133,6 @@ static bool DeleteRouteImpl(char* method, char* route, bool is_regex_route, bool
             }
             else {
                 if (i+1 > INITIAL_GLOBAL_ROUTE_CALLBACK_ARRAY_SIZE) {
-                    printf("--------------------------\n");
-                    printf("Resized route_callback_array.\n");
-                    printf("--------------------------\n");
                     ArenaIncrementOffset(allocator.route_callback_arena, sizeof(HTTPRouteCallback)*10);
                 }
                 memmove(global_route_callback_array+i, global_route_callback_array+i+1, sizeof(HTTPRouteCallback)*global_route_callback_index);
@@ -175,44 +170,7 @@ void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
 	}
 }
 
-
-#if 0
-void HTTP_SetDefaultPUTDirectory(char* default_dir) {
-    bool valid_path = false;
-    switch (CreateDir(default_dir)) {
-        case DIR_ALREADY_EXISTS: 
-            printf("[WARNING] HTTP_SetDefaultPUTDirectory() the directory at the path specified: `%s` already exists.\n", default_dir);
-            valid_path = true;
-            break;
-        case PATH_NOT_FOUND: 
-            printf("[ERROR] HTTP_SetDefaultPUTDirectory() a component of the path specified: `%s` doesn't exist.\n", default_dir);
-            valid_path = false;
-            break;
-        case GIVEN_INVALID_FILE_PATH:
-            printf("[ERROR] HTTP_SetDefaultPUTDirectory() given an invalid path `%s`.\n", default_dir);
-            valid_path = false;
-            break;
-        case SUCCESS: 
-            printf("Successfully created the PUT directory at the path specified: `%s`\n", default_dir);
-            valid_path = true;
-            break;
-        case OTHER_ERROR:
-            printf("[ERROR] HTTP_SetDefaultPUTDirectory() an expected error occured when creating the directory at the path specified: `%s`\n", default_dir);
-            valid_path = false;
-            break;
-    }
-
-    if (valid_path) {
-        put_request_default_dir = PushString(allocator.permanent_arena, strlen(default_dir)+1);
-        strcpy(put_request_default_dir, default_dir);
-    }
-    else {
-        put_request_default_dir = PushString(allocator.permanent_arena, 4);
-        strcpy(put_request_default_dir, "");
-    }
-}
-#endif
-
+// TODO(ali): See if we are going to need this or just remove it.
 /* bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) { */
 /* 	// Checking if the route is in the correct format. */
 /* 	if (origin_route[0] != '/') { */
@@ -280,12 +238,12 @@ char* HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String m
     char* valid_month[]     = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
     if (day_name.count != 3) {
-        printf("[ERROR] HTTP_CreateDateString() day_name needs to be a 3 character string, currently it is %lld characters.\n", day_name.count);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() day_name needs to be a 3 character string, currently it is %lld characters.\n", day_name.count);
         return NULL;
     }
 
     if (month.count != 3) {
-        printf("[ERROR] HTTP_CreateDateString() month needs to be a 3 character string, currently it is %lld characters.\n", month.count);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() month needs to be a 3 character string, currently it is %lld characters.\n", month.count);
         return NULL;
     }
 
@@ -298,7 +256,7 @@ char* HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String m
     }
 
     if (!is_valid_day_name) {
-        printf("[ERROR] HTTP_CreateDateString() day_name's current string `%s` is incorrect, it must be one of the following `Mon, Tue, Wed, Thu, Fri, Sat, Sun`.\n", day_name.string);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() day_name's current string `%s` is incorrect, it must be one of the following `Mon, Tue, Wed, Thu, Fri, Sat, Sun`.\n", day_name.string);
         return NULL;
     }
 
@@ -312,32 +270,32 @@ char* HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String m
     }
 
     if (!is_valid_month) {
-        printf("[ERROR] HTTP_CreateDateString() month's current string `%s` is incorrect, it must be one of the following `Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec`.\n", month.string);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() month's current string `%s` is incorrect, it must be one of the following `Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec`.\n", month.string);
         return NULL;
     }
 
     if (year > 9999 || year < 0) {
-        printf("[ERROR] HTTP_CreateDateString() year's current value `%d` is incorrect, it must be in the range 0-9999.\n", year);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() year's current value `%d` is incorrect, it must be in the range 0-9999.\n", year);
         return NULL;
     }
 
     if (day_num < 1 || day_num > 31) {
-        printf("[ERROR] HTTP_CreateDateString() day's current value `%d` is incorrect, it must be in the range 1-31.\n", day_num);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() day's current value `%d` is incorrect, it must be in the range 1-31.\n", day_num);
         return NULL;
     }
 
     if (hour < 0 || hour > 23) {
-        printf("[ERROR] HTTP_CreateDateString() hour's current value `%d` is incorrect, it must be in the range 0-23.\n", hour);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() hour's current value `%d` is incorrect, it must be in the range 0-23.\n", hour);
         return NULL;
     }
 
     if (minute < 0 || minute > 59) {
-        printf("[ERROR] HTTP_CreateDateString() minute's current value `%d` is incorrect, it must be in the range 0-59.\n", minute);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() minute's current value `%d` is incorrect, it must be in the range 0-59.\n", minute);
         return NULL;
     }
 
     if (second < 0 || second > 59) {
-        printf("[ERROR] HTTP_CreateDateString() second's current value `%d` is incorrect, it must be in the range 0-59.\n", second);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDateString() second's current value `%d` is incorrect, it must be in the range 0-59.\n", second);
         return NULL;
     }
 
@@ -510,7 +468,7 @@ bool HTTP_Set404Page(char* path_to_error_page) {
 
     ThreadReadWriteLock_ReleaseExclusiveLock(&ctx.error_page_shared_mutex);
     if (!successfully_set_404_page) {
-        printf("[ERROR] HTTP_Set404Page() No file exists at the path: `%s`.\n", path_to_error_page);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_Set404Page() No file exists at the path: `%s`.\n", path_to_error_page);
     }
 
     return successfully_set_404_page;
@@ -540,12 +498,12 @@ static int Send404Page(SSL* ssl, char* route) {
         http_error_header_length = strlen(http_error_header) + file_contents.count;
         memcpy(http_error_header+strlen(http_error_header), file_contents.string, file_contents.count);
 
-        printf("[ERROR HEADER] `%s`\n", http_error_header);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HEADER `%s`\n", http_error_header);
     }
 
     ThreadReadWriteLock_ReleaseSharedLock(&ctx.error_page_shared_mutex);
 
-    printf("[SERVER] Sent 404 message for route: %s\n", route);
+    HTTP_Log(HTTP_INFO, "[SERVER] Sent 404 message for route: %s\n", route);
 
     SSL_write(ssl, http_error_header, http_error_header_length);
 
@@ -595,7 +553,6 @@ static void HTTP_ConvertContentTypeToFileExtension(char* content_type, char* fil
 }
 
 static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_body) {
-	printf("[POST Request Data] %s\n", request_body);
     Temp scratch = GetScratch(0, 0);
 
 	Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_body, '&', false);
@@ -604,7 +561,7 @@ static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_bo
 	if (request_body[0] != 0) {
 		for (int index = 0; index < request_key_value_dict.count; index ++) {
 
-            // TODO: Support arrays?
+            // TODO(ali): Support arrays?
             cJSON* item = NULL;
             if (IsInteger(request_key_value_dict.values[index])) {
                 char* endptr;
@@ -628,8 +585,6 @@ static void ConvertURIDataToJSON(HTTPRequestInfo* request_info, char* request_bo
 		}
 	}
 
-	printf("[POST Request Processing]: %s\n", cJSON_Print(request_info->json_request_body));
-
     DeleteScratch(scratch);
 }
 
@@ -638,23 +593,23 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
     char** source_string = &source->string;
 
     if (request_info->contains_query_string) {
-        // Using regex to extract matching variables from the file contents buffer.
+        // NOTE(ali): Using regex to extract matching variables from the file contents buffer.
         StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source_string, "{{[^}]*}}");
 
         char** trim_file_vars = PushArray(scratch.arena, char*, original_file_vars_matches.count);
         for (int index = 0; index < original_file_vars_matches.count; index++) {
             char* temp = RemoveWhitespaceFrontAndBack(scratch.arena, original_file_vars_matches.array[index], 2, 2);
-            // Remove `}}` from the string.
+            // NOTE(ali): Remove `}}` from the string.
             temp[strlen(temp)-2] = 0;
-            // Remove `{{` from the string.
+            // NOTE(ali): Remove `{{` from the string.
             temp += 2;
             trim_file_vars[index] = temp;
         }
 
-        // Extracting variables and values into key_value_pairs_array;
+        // NOTE(ali): Extracting variables and values into key_value_pairs_array;
         Dict request_key_value_dict = ParseURIKeyValuePairString(scratch.arena, request_info->query_string, '&', false);
 
-        // Replacing variables in the file contents buffer with their values
+        // NOTE(ali): Replacing variables in the file contents buffer with their values
         for (int file_var_index = 0; file_var_index < original_file_vars_matches.count; file_var_index++) {
             for (int key_index = 0; key_index < request_key_value_dict.count; key_index ++) {
                 if (!strcmp(trim_file_vars[file_var_index], request_key_value_dict.keys[key_index])) {
@@ -666,34 +621,32 @@ void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* varia
         TempEnd(scratch);
     }
 
-    // Checking if any of the variables are defined in global_variable_key_value_pairs_array.
-    // Getting regex again because we do not want to override any of the variables which were
-    // changed by values defined in the route itself.
+    // NOTE(ali): Checking if any of the variables are defined in global_variable_key_value_pairs_array.
+    //            Getting regex again because we do not want to override any of the variables which were
+    //            changed by values defined in the route itself.
     StringArray original_file_vars_matches = StrRegexGetMatches(scratch.arena, *source_string, "{{[^}]*}}");
 
     char** trim_file_vars = PushArray(scratch.arena, char*, original_file_vars_matches.count);
     for (int index = 0; index < original_file_vars_matches.count; index++) {
         char* temp = RemoveWhitespaceFrontAndBack(scratch.arena, original_file_vars_matches.array[index], 2, 2);
-        // Remove `}}` from the string.
+        // NOTE(ali): Remove `}}` from the string.
         temp[strlen(temp)-2] = 0;
-        // Remove `{{` from the string.
+        // NOTE(ali): Remove `{{` from the string.
         temp += 2;
         trim_file_vars[index] = temp;
     }
 
     if (variables != NULL) {
-        printf("[GET PROCESSSING]: %s\n", cJSON_Print(variables));
-
         for (int i = 0; i < original_file_vars_matches.count; i++) {
             cJSON* elem = NULL;
             cJSON_ArrayForEach(elem, variables) {
                 if (cJSON_IsObject(elem)) {
-                    printf("[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains nested objects which is not supported, please pass in a single JSON object.\n");
+                    HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains nested objects which is not supported, please pass in a single JSON object.\n");
                     DeleteScratch(scratch);
                     return;
                 }
                 else if (cJSON_IsArray(elem)) {
-                    printf("[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains an array which is not supported, please pass in a single JSON object.\n");
+                    HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_TemplateText() The variables JSON object you passed in contains an array which is not supported, please pass in a single JSON object.\n");
                     DeleteScratch(scratch);
                     return;
                 }
@@ -736,12 +689,12 @@ void HTTP_AddCookieToCookieJar(Arena* arena,
                                bool http_only) {
 
     if (key == NULL) {
-        printf("[ERROR] HTTP_AddCookieToCookieJar() can't add cookie to cookie jar as the key is NULL.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_AddCookieToCookieJar() Can't add cookie to cookie jar as the key is NULL.\n");
         return;
     }
 
     if (value == NULL) {
-        printf("[ERROR] HTTP_AddCookieToCookieJar() can't add cookie to cookie jar as the value is NULL.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_AddCookieToCookieJar() Can't add cookie to cookie jar as the value is NULL.\n");
         return;
     }
 
@@ -770,7 +723,7 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 
     if (!SSL_CTX_set_min_proto_version(context, TLS1_2_VERSION)) {
         SSL_CTX_free(context);
-        printf("[ERROR] Failed to set the minimum TLS protocol version.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] Failed to set the minimum TLS protocol version.\n");
         ERR_print_errors_fp(stderr);
     }
 
@@ -784,23 +737,25 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
     SSL_CTX_set_verify(context, SSL_VERIFY_NONE, NULL);
 
     if (SSL_CTX_use_certificate_file(context, path_to_certificate, SSL_FILETYPE_PEM) <= 0) {
-        printf("[INFO] Started loading certificate file.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] Error loading certificate file.\n");
         ERR_print_errors_fp(stderr);
-        printf("[INFO] Finished loading certificate file.\n");
         return 1;
     } 
 
+    HTTP_Log(HTTP_INFO, "[INFO] Successfully loaded certficate.\n");
+
     if (SSL_CTX_use_PrivateKey_file(context, path_to_private_key, SSL_FILETYPE_PEM) <= 0) {
-        printf("[INFO] Started loading private key file.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] Error loading private key file.\n");
         ERR_print_errors_fp(stderr);
-        printf("[INFO] Finished loading private key file.\n");
         return 1;
     }
+
+    HTTP_Log(HTTP_INFO, "[INFO] Successfully loaded private key.\n");
 
     BIO* client_socket = BIO_new_accept(server_port);
     if (client_socket == NULL) {
         SSL_CTX_free(context);
-        printf("[ERROR] An error occured when creating the accept BIO.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] An error occured when creating the accept BIO.\n");
         ERR_print_errors_fp(stderr);
     }
 
@@ -808,7 +763,7 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 
     if (BIO_do_accept(client_socket) <= 0) {
         SSL_CTX_free(context);
-        printf("[ERROR] An error occured when setting up the client socket.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] An error occured when setting up the client socket.\n");
         ERR_print_errors_fp(stderr);
     }
 
@@ -819,12 +774,11 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
         }
 
         BIO* client_bio = BIO_pop(client_socket);
-        printf("[INFO] New client accepted.\n");
-	    printf("===================================\nGot a new client.\n===========================================\n");
+        HTTP_Log(HTTP_INFO, "[INFO] New client accepted.\n");
 
         SSL* ssl = SSL_new(context);
         if (ssl == NULL) {
-            printf("[ERROR] An error occured when creating the SSL handle for the new client.\n");
+            HTTP_Log(HTTP_ERROR, "[ERROR] An error occured when creating the SSL handle for the new client.\n");
             ERR_print_errors_fp(stderr);
             BIO_free(client_bio);
             continue;
@@ -833,8 +787,8 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
         SSL_set_bio(ssl, client_bio, client_bio);
 
         if (SSL_accept(ssl) <= 0) {
-            printf("[ERROR] An error occured when performing the SSL handshake with the client.\n");
-            printf("[ERROR CODE] `%s`\n", ERR_error_string(ERR_get_error(), NULL));
+            HTTP_Log(HTTP_ERROR, "[ERROR] An error occured when performing the SSL handshake with the client.\n");
+            HTTP_Log(HTTP_ERROR, "[ERROR] CODE `%s`\n", ERR_error_string(ERR_get_error(), NULL));
             SSL_free(ssl);
             continue;
         }
@@ -847,27 +801,12 @@ int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_p
 	return 0;
 }
 
-#if 0
-void CreateHTTPResponseFunc(char* receiving_buffer, SOCKET client_socket) { 
-    printf("CreateHTTPResponseFunc: ctx.thread_id: %d, receiving_buffer: `%s`, client_socket: %lld\n", ctx.thread_id, receiving_buffer, client_socket);
-    /* Temp scratch = GetScratch(0, 0); */
-    cJSON* obj = cJSON_CreateObject();
-    cJSON_AddStringToObject(obj, "some", "second");
-    printf("In ctx.thread_id: %d, receiving_buffer: `%s`\n", ctx.thread_id, receiving_buffer);
-    printf("obj: `%s`\n", cJSON_Print(obj));
-}
-#endif
-
 // TODO: May not need to pass in the ThreadContext if it is a _Thread_local global variable?
 void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
     Arena* recycle_arena = ctx.recycle_arena;
     char* receiving_buffer = PushString(recycle_arena, MAX_HTTP_REQUEST_SIZE);
 
     while (SSL_read(ssl, receiving_buffer, MAX_HTTP_REQUEST_SIZE) > 0) {
-        printf("[SERVER] Got request receiving buffer: `%s`\n", receiving_buffer);
-        /* printf("[SERVER] Bytes received: %d\n", init_result); */
-        printf("[SERVER] Data Received: %s\n", receiving_buffer);
-
         // Parsing HTTP Request
         HTTPRequestInfo request_info = { 
             .contains_query_string = false,
@@ -931,21 +870,14 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
         for (int index = 0; index < request_info.headers.count; index ++) {
             if (!strcmp(request_info.headers.keys[index], "Content-Type")) {
                 if (!strcmp(request_info.headers.values[index], "application/json")) {
-                    printf("------------------------------\n");
-                    printf("JUST GOT A JSON FORMAT REQUEST!!!\n");
-                    printf("------------------------------\n");
                     request_info.is_json_request = true;
                 }
                 break;
             }
             else if (!strcmp(request_info.headers.keys[index], "Cookie")) {
-                printf("------------------------------\n");
-                printf("GOT COOKIES!!!\n");
-                printf("------------------------------\n");
                 request_info.cookies = ParseURIKeyValuePairString(recycle_arena, request_info.headers.values[index], ';', true);
                 for (int i = 0; i < request_info.cookies.count; i++) {
                     if (!strcmp(request_info.cookies.keys[i], "SessionID")) {
-                        printf("--------- GOT SESSION ID!!! ---------\n");
                         request_info.session_id = request_info.cookies.values[i];
                     }
                 }
@@ -998,16 +930,12 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
 
                     if (HTTP_Auth_SessionCheckIsEnabled()) {
                         if (HTTP_Auth_CheckSessionIDExists(request_info.session_id)) {
-                            printf("An existing user was found at session id: `%s`\n", request_info.session_id);
                             StringArray user_specific_permissions = HTTP_Auth_StringArray_GetPermissionsAtSessionID(recycle_arena, request_info.session_id);
                             bool found_matching_permisison = false;
 
                             for (int x = 0; x < user_specific_permissions.count && !found_matching_permisison; x++) {
                                 for (int y = 0; y < global_route_callback_array[i].permissions.count; y++) {
                                     if (!strcmp(global_route_callback_array[i].permissions.array[y], user_specific_permissions.array[x])) {
-                                        printf("----------------------------------\n");
-                                        printf("Found matching permission at: user_specific_permissions: `%s`, global_route_callback_array: `%s`\n", user_specific_permissions.array[x], global_route_callback_array[i].permissions.array[y]);
-                                        printf("----------------------------------\n");
                                         request_info.user_permission = user_specific_permissions.array[x];
                                         global_route_callback_array[i].response_func(recycle_arena, &request_info, &output);
                                         found_matching_permisison = true;
@@ -1046,7 +974,7 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
             }
 
             if (!contains_content_type_header) {
-                printf("[SERVER] No `Content-Type` header specified for response at route `%s`, sending 404 page.\n", request_info.route_to_use);
+                HTTP_Log(HTTP_INFO, "[SERVER] No `Content-Type` header specified for response at route `%s`, sending 404 page.\n", request_info.route_to_use);
                 if (Send404Page(ssl, request_info.original_route) <= 0) {
                     break;
                 }
@@ -1111,20 +1039,11 @@ void CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl) {
             break;
         }
 
-
-        /* printf("[SERVER] Bytes sent: %d\n", init_send_result); */
-
-        printf("[SERVER] Data sent (HEADER): %s\n", http_response_header);
-        /* printf("[SERVER] Data sent (DATA): %s\n", output.response_body.string); */
-        printf("[SERVER] Data sent (Strlen DATA): %zd\n", strlen(output.response_body.string));
-        printf("[SERVER] Data sent (Predicted DATA): %lld\n", output.response_body.count);
-
         reset_recycle_arena:
         ArenaDealloc(recycle_arena);
         receiving_buffer = PushString(recycle_arena, MAX_HTTP_REQUEST_SIZE);
     }
 
-    printf("[INFO] Client connection closed.\n");
     // TODO: Should probably run checks first to see if an error occured using SSL_get_error()
     //       SSL_shutdown() can cause errors if certain errors occured in SSL_read()
     SSL_shutdown(ssl);

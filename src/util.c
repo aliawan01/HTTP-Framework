@@ -29,3 +29,34 @@ char* ConvertStrArrayToString(Arena* arena, StringArray string_array, char* sepa
 ThreadContext HTTP_Thread_GetContext(void) {
     return ctx;
 }
+
+void HTTP_Log(enum HTTPLogType type, char* formatString, ...) {
+    va_list args;
+    va_start(args, formatString);
+
+    Temp scratch = GetScratch(0, 0);
+
+    char* formatStringWithColor = PushString(scratch.arena, strlen(formatString)+20);
+
+    if (type == HTTP_ERROR) {
+        strcat(formatStringWithColor, "\033[0;31m");
+        strcat(formatStringWithColor, formatString);
+        strcat(formatStringWithColor, "\033[0m");
+
+        vfprintf(stderr, formatStringWithColor, args);
+        DeleteScratch(scratch);
+    }
+    else if (type == HTTP_WARNING) {
+        strcat(formatStringWithColor, "\033[0;33m");
+    }
+    else {
+        strcat(formatStringWithColor, "\033[0;32m");
+    }
+
+    strcat(formatStringWithColor, formatString);
+    strcat(formatStringWithColor, "\033[0m");
+    vfprintf(stdout, formatStringWithColor, args);
+    DeleteScratch(scratch);
+
+    va_end(args);
+}

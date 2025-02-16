@@ -17,6 +17,12 @@ typedef struct {
     int count;
 } StringArray;
 
+enum HTTPLogType {
+    HTTP_INFO,
+    HTTP_WARNING,
+    HTTP_ERROR
+};
+
 static bool IsPowerOfTwo(uint64_t num) {
     return (num != 0) && (num & (num-1)) == 0;
 }
@@ -60,7 +66,12 @@ extern HTTPEXPORTFUNC Allocator allocator;
 extern HTTPEXPORTFUNC HTTPDatabase http_database;
 extern _Thread_local ThreadContext ctx;
 
+/*
+   @desc Gets the current thread's context.
+   @return Returns the current thread's context.
+*/
 HTTPEXPORTFUNC ThreadContext HTTP_Thread_GetContext(void);
+void HTTP_Log(enum HTTPLogType type, char* formatString, ...);
 
 #ifdef __cplusplus
 }

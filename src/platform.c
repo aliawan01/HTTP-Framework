@@ -44,11 +44,11 @@ bool HTTP_DeleteDirRecursive(char* dir_name) {
 
     
     if (!SHFileOperationA(&delete_dir)) {
-        printf("[INFO] HTTP_DeleteDirRecursive() Successfully deleted directory with name: `%s`\n", dir_name);
+        printf("\033[0;32m[INFO] HTTP_DeleteDirRecursive() Successfully deleted directory with name: `%s`\033[0m\n", dir_name);
         success = true;
     }
     else {
-        printf("[ERROR] HTTP_DeleteDirRecursive() Unable to delete directory with name: `%s`\n", dir_name);
+        printf("\033[0;31m[ERROR] HTTP_DeleteDirRecursive() Unable to delete directory with name: `%s`\033[0m\n", dir_name);
     }
 
     return success;
@@ -57,7 +57,7 @@ bool HTTP_DeleteDirRecursive(char* dir_name) {
 void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count) {
     Assert(buffer_count > 257);
 
-    int random_num;
+    unsigned int random_num;
     for (int i = 0; i < 256; i += 4) {
         rand_s(&random_num);
         snprintf(buffer+i, 5, "%d", abs(random_num));
@@ -106,11 +106,11 @@ void Thread_Create(Thread* thread, ThreadFunction function, void* args) {
     *thread = CreateThread(NULL, 0, function, args, 0, NULL);
 }
 
-void* MemoryAlloc(int size) {
+void* MemoryAlloc(uint64_t size) {
     return VirtualAlloc(0, size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
 }
 
-void  MemoryFree(void* buffer, int size) {
+void MemoryFree(void* buffer, uint64_t size) {
     VirtualFree(buffer, 0, MEM_RELEASE);
 }
 
@@ -221,11 +221,11 @@ void Thread_Create(Thread* thread, ThreadFunction function, void* args) {
     pthread_create(thread, NULL, function, args);
 }
 
-void* MemoryAlloc(int size) {
+void* MemoryAlloc(uint64_t size) {
     return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 }
 
-void MemoryFree(void* buffer, int size) {
+void MemoryFree(void* buffer, uint64_t size) {
     munmap(buffer, size);
 }
 

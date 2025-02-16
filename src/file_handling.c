@@ -19,11 +19,11 @@ bool HTTP_DeleteFile(char* file_name) {
     bool success = false;
 
     if (!remove(file_name)) {
-        printf("[INFO] HTTP_DeleteFile() Successfully deleted file with file name: `%s`\n", file_name);
+        HTTP_Log(HTTP_INFO, "[INFO] HTTP_DeleteFile() Successfully deleted file with file name: `%s`\n", file_name);
         success = true;
     }
     else {
-        printf("[ERROR] HTTP_DeleteFile() Unable to delete file with file name: `%s`.\n", file_name);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_DeleteFile() Unable to delete file with file name: `%s`.\n", file_name);
     }
 
     return success;
@@ -32,7 +32,7 @@ bool HTTP_DeleteFile(char* file_name) {
 int64_t HTTP_FindFileSize(char *file_name) {
 	FILE* file = fopen(file_name, "rb");
 	if (file == NULL) {
-		printf("FindFileSize(): Error couldn't open the file %s\n", file_name);
+		HTTP_Log(HTTP_ERROR, "FindFileSize(): Error couldn't open the file %s\n", file_name);
 		return -1;
 	}
 
@@ -47,7 +47,7 @@ String HTTP_GetFileContents(Arena* arena, char* file_name) {
 
 	FILE* file = fopen(file_name, "rb");
 	if (file == NULL) {
-		printf("GetFileContents(): Error couldn't open the file %s\n", file_name);
+		HTTP_Log(HTTP_ERROR, "GetFileContents(): Error couldn't open the file %s\n", file_name);
 		return file_contents;
 	}
 
@@ -60,17 +60,13 @@ String HTTP_GetFileContents(Arena* arena, char* file_name) {
 	fread(file_contents.string, sizeof(char), file_contents.count+1, file);
 	fclose(file);
 
-    printf("Inside HTTP_GetFileContents(%s)\n", file_name);
-    printf("\tStrlen(): %lld\n", strlen(file_contents.string));
-    printf("\tHTTP_FindFileSize(): %lld\n", file_contents.count);
-
 	return file_contents;
 }
 
 bool HTTP_OverwriteFileContents(char* file_name, char* new_file_contents) {
 	FILE* file = fopen(file_name, "wb+");
 	if (file == NULL) {
-		printf("OverwriteFileContents(): Error couldn't open the file %s\n", file_name);
+		HTTP_Log(HTTP_ERROR, "OverwriteFileContents(): Error couldn't open the file %s\n", file_name);
 		return false;
 	}
 

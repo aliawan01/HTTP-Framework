@@ -220,18 +220,152 @@ global_variable char* path_to_404_page;
 global_variable char** search_dirs;
 global_variable int search_dirs_size;
 
-HTTPEXPORTFUNC void   HTTP_Initialize(void);
-HTTPEXPORTFUNC bool   HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
-HTTPEXPORTFUNC bool   HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
-HTTPEXPORTFUNC bool   HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
-HTTPEXPORTFUNC void   HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
-HTTPEXPORTFUNC bool   HTTP_Set404Page(char* path_to_error_page);
-HTTPEXPORTFUNC int    HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_private_key);
-HTTPEXPORTFUNC void   HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
-HTTPEXPORTFUNC void   HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
-HTTPEXPORTFUNC void   HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
+/*
+   @desc Initializes the HTTPS server and sets up necessary memory arenas, 
+         thread context and cJSON hooks.
+*/
+HTTPEXPORTFUNC void HTTP_Initialize(void);
+
+/*
+   @desc Handles the registration of a new route with specified permissions and callback function.
+         This function ensures the route is valid and does not already exist before adding it.\n\n
+         - NOTE: A route path can be duplicated with different/same callback functions if the method
+                 being used is different.\n
+                 e.g. the following snippet is valid.
+    `HTTP_HandleRoute(StrArrayLit("global"), "GET", "/a_route", true, first_callback);\n
+     HTTP_HandleRoute(StrArrayLit("global"), "POST", "/a_route", true, second_callback);`
+                
+
+   @param permissions The permissions required for the route.
+   @param method The HTTP method (GET, POST, etc.) for the route.
+   @param route The route path.
+   @param is_regex_route Flag to indicate if the route uses regular expressions.
+   @param response_func The callback function to handle responses for the route.
+   @return Returns true if the route was successfully added, false if there was an error or conflict.
+*/
+HTTPEXPORTFUNC bool HTTP_HandleRoute(StringArray permissions, char* method, char* route, bool is_regex_route, void (*response_func)(Arena* arena, HTTPRequestInfo*, HTTPResponse*));
+
+/*
+   @desc Deletes a specific route for the specified HTTP method.
+         The route will be removed if we can find one which matches
+         the specified method and route.
+   @param method The HTTP method (GET, POST, etc.) for the route to delete.
+   @param route The route path to delete.
+   @param is_regex_route Flag to indicate if the route is a regex route.
+   @return Returns true if the route was successfully deleted, false otherwise.
+*/
+HTTPEXPORTFUNC bool HTTP_DeleteRouteForMethod(char* method, char* route, bool is_regex_route);
+
+/*
+   @desc Deletes a specific route for all HTTP methods.
+         All routes which match the specified attributes will be removed.
+   @param route The route path to delete.
+   @param is_regex_route Flag to indicate if the route is a regex route.
+   @return Returns true if the routes was successfully deleted, false otherwise.
+*/
+HTTPEXPORTFUNC bool HTTP_DeleteRouteForAllMethod(char* route, bool is_regex_route);
+
+/*
+   @desc Sets the search directories for the HTTP server.
+         This function allows specifying directories to search for files
+         when serving requests.
+   @param dirs Array of directory paths.
+   @param dirs_size The number of directories in the `dirs` array.
+*/
+HTTPEXPORTFUNC void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size);
+
+/*
+   @desc Sets the path for the custom 404 error page.
+         If a valid file path is provided, it will be used as the error
+         page, otherwise the default 404 error page will be used.
+   @param path_to_error_page The file path to the 404 error page (should be a html file).
+   @return Returns true if the 404 page was successfully set, false if the file does not exist.
+*/
+HTTPEXPORTFUNC bool HTTP_Set404Page(char* path_to_error_page);
+
+/*
+   @desc Starts the HTTP server on the specified port with SSL encryption.
+         This function sets up the server, initializes OpenSSL, and begins 
+         accepting client connections. If the certificate or private key file
+         paths are invalid then the server will not statup and will return 1.
+   @param server_port The port on which the server will run.
+   @param path_to_certificate The file path to the SSL certificate.
+   @param path_to_private_key The file path to the SSL private key.
+   @return Returns 0 if the server starts successfully, or a 1 if the server setup fails.
+*/
+HTTPEXPORTFUNC int HTTP_RunServer(char* server_port, char* path_to_certificate, char* path_to_private_key);
+
+/*
+   @desc Adds a header to the HTTP response header dictionary.
+         This function adds a key-value pair to the header dictionary,
+         which will be included in the HTTP response (should only be used inside
+         callback functions).
+   @param arena The Arena to allocate memory for the header.
+   @param header_dict The dictionary to store the HTTP headers.
+   @param key The header key.
+   @param value The header value.
+   @return This function does not return any value.
+*/
+HTTPEXPORTFUNC void HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value);
+
+// TODO(ali): Could improve the explanation here.
+/*
+   @desc Adds a cookie to the cookie jar.
+         This function creates a new cookie with the specified attributes
+         and adds it to the provided cookie jar (should only be used inside of 
+         callback functions).
+   @param arena The Arena to allocate memory for the cookie.
+   @param cookie_jar The cookie jar to which the cookie will be added.
+   @param key The cookie key.
+   @param value The cookie value.
+   @param max_age The maximum age of the cookie in seconds.
+   @param expires The expiry date of the cookie.
+   @param path The route for which the cookie is valid.
+   @param domain The domain for which the cookie is valid.
+   @param secure Flag indicating whether the cookie is secure.
+   @param http_only Flag indicating whether the cookie should only be used with HTTP.
+*/
+HTTPEXPORTFUNC void HTTP_AddCookieToCookieJar(Arena* arena, CookieJar* cookie_jar, char* key, char* value, int64_t max_age, char* expires, char* path, char* domain, bool secure, bool http_only);
+
+/*
+   @desc Templates text by replacing variables in the file with actual values from the HTTP request and JSON values.
+         This function processes template files (e.g. html) and replaces placeholders with corresponding values from
+         the request or values from any JSON data that has been sent (should only be used inside of a callback function).
+   @param arena The Arena for memory allocation.
+   @param request_info The HTTPRequestInfo object passed into the callback function.
+   @param variables A cJSON object containing the variables to be replaced.
+   @param source The source string to be modified (you can get the contents of a file as a string using `HTTP_GetFileContents`),
+                 the source string will be modified in place.
+*/
+HTTPEXPORTFUNC void HTTP_TemplateText(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, String* source);
+
+/*
+   @desc Loads and templates a file by replacing variables with actual values from the HTTP request and JSON values.
+         This function loads the file, templates it by replacing placeholders with actual values, and returns the 
+         modified string.
+   @param arena The Arena for memory allocation.
+   @param request_info The HTTPRequestInfo object passed into the callback function.
+   @param variables A cJSON object containing the variables to be replaced.
+   @param file_path The path to the file to be templated.
+   @return Returns the processed content as a String.
+*/
 HTTPEXPORTFUNC String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJSON* variables, char* file_path);
-HTTPEXPORTFUNC char*  HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);
+
+/*
+   @desc Creates a date string in a specific format.
+         This function creates a date string in the format: "Day, DD Month YYYY HH:MM:SS GMT".
+   @param arena The arena for memory allocation.
+   @param day_name The day of the week (e.g., Mon, Tue, etc.).
+   @param day_num The day of the month (1-31).
+   @param month The month (e.g., Jan, Feb, etc.).
+   @param year The year (e.g., 2022).
+   @param hour The hour of the day (0-23).
+   @param minute The minute (0-59).
+   @param second The second (0-59).
+   @return Returns the formatted date string.
+*/
+HTTPEXPORTFUNC char* HTTP_CreateDateString(Arena* arena, String day_name, int day_num, String month, int year, int hour, int minute, int second);
+
 // TODO: Maybe we can move this to a better place.
 void   CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl);
 

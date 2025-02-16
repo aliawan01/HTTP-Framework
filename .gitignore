@@ -7,6 +7,7 @@ new.db
 debug_symbols/
 src/cJSON.c
 vendor/
+lexer/
 
 example/example_server/include/
 example/example_server/vendor/

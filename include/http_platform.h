@@ -28,7 +28,7 @@ extern "C" {
     if (!(condition)) { \
         fprintf(stderr, "Assertion in file: %s at line %d\n", __FILE__, __LINE__); \
         /* TODO(ali): Find a way to do this on linux */ \
-        /* __debugbreak();*/ \
+         __debugbreak(); \
     }           
 #else
 #define Assert(condition)
@@ -88,9 +88,32 @@ enum HTTPCreateDirStatus {
     OTHER_ERROR
 };
 
-// Platform Specific Functions
+// NOTE(ali):  Platform Specific Functions
+
+/*
+   @desc Creates a directory at the specified file path and 
+         returns the status of the operation.
+   @param file_path The path where the directory should be created.
+   @return Returns a `HTTPCreateDirStatus` enum indicating the status
+           of the directory creation operation.
+*/
 HTTPEXPORTFUNC enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path);
+
+/*
+   @desc Recursively deletes a directory and its contents.
+         This function deletes the specified directory and
+         any files or subdirectories inside it.
+   @param dir_name The name of the directory to delete.
+   @return Returns true if the directory and its contents were successfully deleted, false otherwise.
+*/
 HTTPEXPORTFUNC bool HTTP_DeleteDirRecursive(char* dir_name);
+
+/*
+   @desc Generates a 256 digit random number and stores it as a string
+         in the buffer provided.
+   @param buffer The buffer to store the generated random number.
+   @param buffer_count The size of the buffer (should be at least 256 bytes).
+*/
 HTTPEXPORTFUNC void HTTP_Gen256ByteRandomNum(char* buffer, int buffer_count);
 
 void Thread_Create(Thread* thread, ThreadFunction function, void* args);
@@ -105,8 +128,8 @@ void ThreadSemaphore_Init(ThreadSemaphore* semaphore, int maxCount);
 void ThreadSemaphore_Wait(ThreadSemaphore* semaphore);
 bool ThreadSemaphore_Increment(ThreadSemaphore* semaphore);
 
-void* MemoryAlloc(int size);
-void  MemoryFree(void* buffer, int size);
+void* MemoryAlloc(uint64_t size);
+void  MemoryFree(void* buffer, uint64_t size);
 
 bool AtomicCompareExchange(void* destination, void* compare, int replace);
 

@@ -14,7 +14,10 @@ void* ArenaAllocAligned(Arena* arena, uintptr_t num_of_elem, uintptr_t elem_size
     Assert(IsPowerOfTwo(align_size));
     
     uintptr_t allocation_size = num_of_elem * elem_size;
-    Assert(allocation_size >= elem_size);
+
+    if (allocation_size < elem_size) {
+        return NULL;
+    }
     
     uintptr_t cur_offset = (uintptr_t)arena->current_offset + (uintptr_t)arena->buffer;
     uintptr_t padding = (~cur_offset+1) & (align_size-1);

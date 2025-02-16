@@ -10,25 +10,25 @@ void HTTP_CreateDatabase(char* file_path) {
     error_code = sqlite3_open(file_path, &http_database.database);
 
     if (HTTP_FindFileSize(file_path) == -1) {
-        printf("[INFO] HTTP_CreateDatabase() Found an existing database at the path: `%s`\n", file_path);
+        HTTP_Log(HTTP_INFO, "[INFO] HTTP_CreateDatabase() Found an existing database at the path: `%s`\n", file_path);
         return;
     }
 
     if (error_code != SQLITE_OK) {
-        printf("[ERROR] HTTP_CreateDatabase() An error has occured: `%s`\n", sqlite3_errmsg(http_database.database));
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_CreateDatabase() An error has occured: `%s`\n", sqlite3_errmsg(http_database.database));
     }
     else {
-        printf("[INFO] HTTP_CreateDatabase() Successfully created database at file path: `%s`\n", file_path);
+        HTTP_Log(HTTP_INFO, "[INFO] HTTP_CreateDatabase() Successfully created database at file path: `%s`\n", file_path);
     }
 }
 
 void HTTP_CloseDatabase(void) {
     if (http_database.initialized) {
-        printf("[INFO] HTTP_CloseDatabase() Successfully closed database.\n");
+        HTTP_Log(HTTP_INFO, "[INFO] HTTP_CloseDatabase() Successfully closed database.\n");
         sqlite3_close(http_database.database);
     }
     else {
-        printf("[WARNING] HTTP_CloseDatabase() No database has been attached so it can't be closed.\n");
+        HTTP_Log(HTTP_WARNING, "[WARNING] HTTP_CloseDatabase() No database has been attached so it can't be closed.\n");
     }
 }
 
@@ -83,7 +83,7 @@ cJSON* HTTP_RunSQLQuery(char* sql_query, bool list_response, bool convert_types)
     cJSON* cjson_obj = cJSON_CreateObject();
 
     if (!http_database.initialized) {
-        printf("[ERROR] HTTP_RunSQLQuery() cannot run query as no database has been attached.\n");
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_RunSQLQuery() cannot run query as no database has been attached.\n");
         return cjson_obj;
     }
 
@@ -107,12 +107,9 @@ cJSON* HTTP_RunSQLQuery(char* sql_query, bool list_response, bool convert_types)
     }
         
     if (result_code != SQLITE_OK) {
-        printf("[ERROR] HTTP_RunSQLQuery() An error has occured: `%s`\n", error_message);
+        HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_RunSQLQuery() An error has occured: `%s`\n", error_message);
         sqlite3_free(error_message);
         return NULL;
-    }
-    else {
-        printf("[INFO] HTTP_RunSQLQuery() Successfully ran query.\n");
     }
 
     return cjson_obj;
@@ -124,7 +121,7 @@ void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
     cJSON* array = NULL;
     cJSON_ArrayForEach(array, json_obj) {
         if (!cJSON_IsArray(array)) {
-            printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON object with key: `%s` is not an array.\n", array->string);
+            HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_InsertJSONIntoDatabase() JSON object with key: `%s` is not an array.\n", array->string);
             DeleteScratch(scratch);
             return;
         }
@@ -132,7 +129,7 @@ void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
         cJSON* query_obj = NULL;
         cJSON_ArrayForEach(query_obj, array) {
             if (!cJSON_IsObject(query_obj)) {
-                printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is not an object.\n", query_obj->string);
+                HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is not an object.\n", query_obj->string);
                 DeleteScratch(scratch);
                 return;
             }
@@ -147,7 +144,7 @@ void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
             bool first_object = false;
             cJSON_ArrayForEach(query_obj_data, query_obj) {
                 if (cJSON_IsObject(query_obj_data)) {
-                    printf("[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is an nested object which is not supported.\n", query_obj_data->string);
+                    HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_InsertJSONIntoDatabase() JSON Object with key: `%s` is an nested object which is not supported.\n", query_obj_data->string);
                     DeleteScratch(scratch);
                     return;
                 }
@@ -170,9 +167,8 @@ void HTTP_InsertJSONIntoDatabase(cJSON* json_obj) {
             strcat(values_statement, ");");
             strcat(insert_into_statement, values_statement);
 
-            printf("[INFO] HTTP_InsertJSONIntoDatabase() full insert query: `%s`\n", insert_into_statement);
             if (HTTP_RunSQLQuery(insert_into_statement, false, true) == NULL) {
-                printf("[ERROR] HTTP_InsertJSONIntoDatabase() An error occured when running the SQL code to insert JSON data into the database.");
+                HTTP_Log(HTTP_ERROR, "[ERROR] HTTP_InsertJSONIntoDatabase() An error occured when running the SQL code to insert JSON data into the database.");
             }
         }
     }

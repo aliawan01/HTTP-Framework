@@ -51,6 +51,8 @@ cJSON* HTTP_cJSON_TurnStringToType(char* data) {
 }
 
 char* HTTP_cJSON_GetStringValue(Arena* arena, cJSON* elem) {
+    // TODO(ali): Find a way to get the number of characters
+    //            in the string/number/float.
     char* string_buf = PushString(arena, 256);
     char* string_val = cJSON_GetStringValue(elem);
 

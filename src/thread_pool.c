@@ -88,6 +88,5 @@ bool HTTP_Thread_AddWorkToWorkQueue(WorkQueue* work_queue, Work work) {
     // TODO(ali): Check to make sure this is correct we were checking
     //            if work_queue_semaphore != 0 before incrementing 
     //            before (check commits).
-    printf("=========================\nAdded work to the work queue.\n=====================\n");
     return ThreadSemaphore_Increment(&work_queue_semaphore);
 }

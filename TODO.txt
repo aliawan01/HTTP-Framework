@@ -5,38 +5,26 @@
 
   * Turn the work queue into a ring buffer.
 
-  * Make the functionality of checking if the library is installed onto the system
-    before trying to copy it into the binary directory work on Linux (look how we did
-    it on the Windows scripts it should be similar).
+  *** Finish off the lexer to generate documentation for the project.
+    => Remember to write down docs for certain macros like `HTTP_Auth_AddUserIfNotExists`
+       manually since the lexer didn't find those.
+    => Fix bug where in headings like http_string_handling.h 
+       string gets turned slanted because _word_ is the same as *word*
+       could do the same thing we did with the asterix to make it work
+       (add escape character before it: `\_`).
 
-  * Check if the the shared libraries are installed on the system first and use
-    them if they are otherwise copy them into the binary directory.
 
-  * Make some more examples e.g. how to run react on it.
+  * Make an example REST API.
+  * Make an example to show how authentication works.
+  * Make server logs easier to read and add colour
 
-  * Make a lexer to generate documentation for the project.
-
+  *** Turn back the HTTPEXPORTFUNC definition in http_platform.h
+      after we made the lexer work!
+  * Make script to build all of the examples.
 
   * Test AtomicCompareExchange to make sure it works right because we 
     probably messed it up. => Seems like it is working properly now.
     => Check to make sure it works on Windows as well.
-
-  * NOTE: With mkcert run `mkcert update-ca-certificates` on ubuntu before
-          generating certificates also need to install `libnss3-tools`
-          before we call install mkcert.
-
-  * NOTE: Need to install `openssl` first then `libssl-dev` to get all
-          the dev libraries.
-          Same for sqlite3 `sqlite3` first then `libsqlite3-dev` to get all
-          the dev libraries.
-          Make a script for this for both windows and linux.
-
-  *** Test it on linux to make sure that it works properly.
-        * Make the multithreading work on Linux.
-        * Will need to abstract the HANDLE and multithreading functions into 
-          the platform layer.
-
-        * Make the project build with all of the dependencies on Linux.
 
   *** Tell the user how to use mkcert to generate certificates in the tutorial.
 
@@ -52,8 +40,6 @@
     threads and arenas.
 
 
-
-  * Make an example REST API.
 
   *** Authentication
       - Add support for running ALTER on the session authentication table to add or 
@@ -95,7 +81,7 @@
     of data we are removing is greater than a page in which case we will deallocate
     the page.
 
-* Create a new function for HTTP_RedirectRoute();
+? Create a new function for HTTP_RedirectRoute();
 
 * Support other HTTP response codes.
  
@@ -117,15 +103,10 @@ TABLE NAME (THE ROUTE) -> FILE AT ROUTE, (OPTIONAL) LOCAL VARIABLES
 * Support parsing lists in json.
 * Add cookies
 
-- Make server logs easier to read and add colour
-- Abstract sockets methods so that we can support Windows and Linux.
-- Add SSL/TLS encryption.
 - Logging data to the database.
 - Add some security checks to make sure that the message being sent is actually a 
   HTTP request.
 - Support sending videos
-- Fill out the rest of the socket functions in platform.h and test them to make
-  sure they work on Linux as well.
 
 NOTES:
 * Could probably just seperate the query string from the actual route first and then

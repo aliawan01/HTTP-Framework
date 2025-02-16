@@ -26,6 +26,14 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern);
 StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separator);
 char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset);
 char* StrReplaceSubstringAllOccurance(Arena* arena, char* source, char* substring, char* replace);
+
+/*
+   @desc Duplicates a string and stores the copy in the specified Arena.
+   @param arena The Arena to store the duplicated string.
+   @param source The source string to duplicate.
+   @return Returns a pointer to the newly duplicated string being stored
+           in the arena.
+*/
 HTTPEXPORTFUNC char* HTTP_StringDup(Arena* arena, char* source);
 
 #ifdef __cplusplus

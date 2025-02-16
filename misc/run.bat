@@ -1,3 +1,4 @@
 @echo off
 
-build\bin\HTTPServer.exe
+REM build\bin\HTTPServer.exe
+build\main.exe

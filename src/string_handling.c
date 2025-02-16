@@ -371,7 +371,6 @@ StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separato
     }
 
 
-    printf("finaly: `%s`\n", string);
     return split_string;
 }
 

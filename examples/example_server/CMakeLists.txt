@@ -1,17 +1,13 @@
-# TODO(ali): Clean this up and make it work on Windows.
 cmake_minimum_required(VERSION 3.21)
 project(BasicHTTPServerExample)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_STANDARD 11)
 
 include_directories("${PROJECT_SOURCE_DIR}/vendor/include")
 include_directories("${PROJECT_SOURCE_DIR}/include")
-
-# # TODO: Absolutely stupid fix this.
-# set(CRYPTO_LIB "C:\\Program Files\\OpenSSL-Win64\\lib\\VC\\x64\\MD\\libcrypto.lib")
-# set(SSL_LIB "C:\\Program Files\\OpenSSL-Win64\\lib\\VC\\x64\\MD\\libssl.lib")
 
 if (MSVC) 
     set(LIB_FOLDER "${PROJECT_SOURCE_DIR}/vendor/windows")
@@ -28,7 +24,7 @@ if (MSVC)
 
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
-    # Required to make the MAP macro work properly
+    # NOTE(ali): Required to make the MAP macro work properly
     add_compile_options(/Zc:preprocessor)
     add_compile_options(/Zc:preprocessor)
     add_compile_options(/DEBUG)
@@ -41,12 +37,10 @@ else()
      find_library(RE_LIB libre.a PATHS ${LIB_FOLDER})
      find_library(CJSON_LIB libcjson.a PATHS ${LIB_FOLDER})
      find_library(CJSON_UTILS_LIB libcjson_utils.a PATHS ${LIB_FOLDER})
-     # TODO(ali): Check to make sure that this works on Linux.
      find_library(HTTP_LIB libHTTPServerLib.so PATHS "/usr/local/lib" "../../build")
 
     # add_compile_options(-fsanitize=address)
 endif()
-
 
 add_executable(basichttpserverexample "server.c" ${WIN_OPENSSL_APPLINK_PATH})
 if (MSVC) 
@@ -55,7 +49,6 @@ if (MSVC)
 
     find_file(HTTP_DLL NAMES HTTPServerLib.dll PATHS "C:/Windows/System32") 
     if (NOT HTTP_DLL) 
-        message("[HTTPServerLib.dll] Couldn't be found in system path is not being copied.")
         add_custom_command(TARGET basichttpserverexample POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different 
             ${PROJECT_SOURCE_DIR}/../../build/bin/HTTPServerLib.dll
