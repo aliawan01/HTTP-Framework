@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script>
+            const getData  = {
+                method: "GET",
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+
+            const postData  = {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    "fname": "John",
+                    "lname": "Carmack",
+                    "age": 36,
+                    "hobby": "Making sick games!"
+                })
+            }
+
+            const deleteData = {
+                method: "DELETE",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    "fname": "John",
+                    "lname": "Carmack",
+                    "age": 36,
+                    "hobby": "Making sick games!"
+                })
+            }
+
+            async function SendRequest(dataType) {
+                const response = await fetch("/", dataType)
+                    .then(response => {
+                        console.log("Initial Response:", response);
+                        return response.json();
+                    }).then(final => {
+                        document.getElementById("result").innerHTML = JSON.stringify(final, null, 4);
+                    })
+            }
+        </script>
+    </head>
+
+    <input type="button" value="GET Request" onclick="SendRequest(getData);" />
+    <br></br>
+    <input type="button" value="POST Request" onclick="SendRequest(postData);" />
+    <br></br>
+    <input type="button" value="DELETE Request" onclick="SendRequest(deleteData);" />
+
+    <pre id="result" style="font-family: 'Georgia'; font-size: 20px;">Something</pre>
+
+    <button>
+</html>

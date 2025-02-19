@@ -12,17 +12,17 @@ Enables Session Authentication, this function creates a table in the connected d
  - TIP: It may be useful to use the `StrArrayLit` macro to intialize arrays for parameters which have type `StringArray` (see code examples to understand how this works).
 
 ### Parameters
-- `auth_table_name` *(char\*)* -  auth_table_name Name of the table to create/store the login and user data.
+- `auth_table_name` *(char\*)* -  Name of the table to create/store the login and user data.
 
-- `login_data` *(StringArray)* -  login_data Name of the fields to store the login data.
+- `login_data` *(StringArray)* -  Name of the fields to store the login data.
 
-- `login_data_types` *(StringArray)* -  login_data_types Name of the types of each of the fields to store the login data.
+- `login_data_types` *(StringArray)* -  Name of the types of each of the fields to store the login data.
 
-- `user_data` *(StringArray)* -  user_data Name of the fields to store the user's data.
+- `user_data` *(StringArray)* -  Name of the fields to store the user's data.
 
-- `user_data_types` *(StringArray)* -  user_data_types Name of the types of each of the fields to store the user's data.
+- `user_data_types` *(StringArray)* -  Name of the types of each of the fields to store the user's data.
 
-- `timeout` *(SessionMaxTimeout\*)* -  timeout The amount of time a Session Token is valid for, if NULL then the timeout is set to 30 days.
+- `timeout` *(SessionMaxTimeout\*)* -  The amount of time a Session Token is valid for, if NULL then the timeout is set to 30 days.
 
 ### Returns
 - `void` - None
@@ -55,9 +55,9 @@ WARNING: Don't call this function directly refer the macro `HTTP_Auth_AddUserIfN
 Adds a user into authentication database the with the information provided as a cJSON object, which contains valid values for all of the login fields (the user fields are optional).
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena An arena to store any data required (use the arena passed into the route callback function).
+- `arena` *(Arena\*)* -  An arena to store any data required (use the arena passed into the route callback function).
 
-- `data` *(cJSON\*)* -  data A cJSON object containing all of the login fields (as strings) with valid values, the user fields can be optionally added.
+- `data` *(cJSON\*)* -  A cJSON object containing all of the login fields (as strings) with valid values, the user fields can be optionally added.
 
 ### Returns
 - `char*` - Returns the Session ID of the user if successful, otherwise NULL.
@@ -70,9 +70,9 @@ Adds a user into authentication database the with the information provided as a 
 Checks if a user with the Session ID specified exists in the authentication database. If it does and the token is expired it will generate a new token and update it in the database, otherwise the token will be left as is.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena An arena to store any data required (use the arena passed into the route callback function).
+- `arena` *(Arena\*)* -  An arena to store any data required (use the arena passed into the route callback function).
 
-- `check_session_id` *(char\*)* -  check_session_id Session ID to check is expired.
+- `check_session_id` *(char\*)* -  Session ID to check is expired.
 
 ### Returns
 - `char*` - Returns the new Session ID of the user if successful, otherwise NULL.
@@ -85,7 +85,7 @@ Checks if a user with the Session ID specified exists in the authentication data
 Check if the user with the Session ID specified exists in the authentication database. If it does then the user is deleted from the database.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id Session ID of the user we are trying to delete.
+- `session_id` *(char\*)* -  Session ID of the user we are trying to delete.
 
 ### Returns
 - `void` - None
@@ -98,7 +98,7 @@ Check if the user with the Session ID specified exists in the authentication dat
 If a user with the Session ID specified exists in the authentication database, we will check whether their token is expired.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id Session ID to check is expired.
+- `session_id` *(char\*)* -  Session ID to check is expired.
 
 ### Returns
 - `bool` - Returns a boolean telling us whether the Session ID is expired, if the user doesn't exist then it will return false.
@@ -111,7 +111,7 @@ If a user with the Session ID specified exists in the authentication database, w
 Checks if the user with the Session ID specified exists in the authentication database.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id Session ID to check exists.
+- `session_id` *(char\*)* -  Session ID to check exists.
 
 ### Returns
 - `bool` - Returns a boolean telling us whether the Session ID is exists.
@@ -124,7 +124,7 @@ Checks if the user with the Session ID specified exists in the authentication da
 Checks if a user with the Session ID specified exists in the authentication database. If they do then we will refresh the expiry date of the their token without changing their Session ID.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id Session ID to refresh expiry date.
+- `session_id` *(char\*)* -  Session ID to refresh expiry date.
 
 ### Returns
 - `bool` - Returns a boolean telling us whether we were successful in refreshing the expiry date of the user at the Session ID specified.
@@ -137,13 +137,13 @@ Checks if a user with the Session ID specified exists in the authentication data
 Retrieves the user data associated with a Session ID.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to fetch the user data for.
+- `session_id` *(char\*)* -  The Session ID to fetch the user data for.
 
-- `remove_null_values` *(bool)* -  remove_null_values Flag to specify whether key-value pairs with null values should be removed from the response.
+- `remove_null_values` *(bool)* -  Flag to specify whether key-value pairs with null values should be removed from the response.
 
-- `list_response` *(bool)* -  list_response Flag to indicate whether key-value pairs should be stored in a list.
+- `list_response` *(bool)* -  Flag to indicate whether key-value pairs should be stored in a list.
 
-- `convert_types` *(bool)* -  convert_types Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
+- `convert_types` *(bool)* -  Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
 
 ### Returns
 - `cJSON*` - Returns a cJSON object containing the user data associated with the Session ID. If no data is found or an error occurs, it returns NULL.
@@ -156,11 +156,11 @@ Retrieves the user data associated with a Session ID.
 Retrieves the login data associated with a Session ID.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to fetch the login data for.
+- `session_id` *(char\*)* -  The Session ID to fetch the login data for.
 
-- `list_response` *(bool)* -  list_response Flag to indicate whether key-value pairs should be stored in a list.
+- `list_response` *(bool)* -  Flag to indicate whether key-value pairs should be stored in a list.
 
-- `convert_types` *(bool)* -  convert_types Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
+- `convert_types` *(bool)* -  Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
 
 ### Returns
 - `cJSON*` - Returns a cJSON object containing the login data associated with the Session ID. If no data is found or an error occurs, it returns NULL.
@@ -173,13 +173,13 @@ Retrieves the login data associated with a Session ID.
 Retrieves both login and user data associated with a Session ID.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to fetch the login and user data for.
+- `session_id` *(char\*)* -  The Session ID to fetch the login and user data for.
 
-- `remove_null_values` *(bool)* -  remove_null_values Flag to specify whether key-value pairs with null values should be removed from the response.
+- `remove_null_values` *(bool)* -  Flag to specify whether key-value pairs with null values should be removed from the response.
 
-- `list_response` *(bool)* -  list_response Flag to indicate whether key-value pairs should be stored in a list.
+- `list_response` *(bool)* -  Flag to indicate whether key-value pairs should be stored in a list.
 
-- `convert_types` *(bool)* -  convert_types Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
+- `convert_types` *(bool)* -  Flag to specify whether values should be converted to their respective types, if false all keys and values will be stored as strings.
 
 ### Returns
 - `cJSON*` - Returns a cJSON object containing both login and user data for the Session ID. If no data is found or an error occurs, it returns NULL.
@@ -192,7 +192,7 @@ Retrieves both login and user data associated with a Session ID.
 Retrieves the Session ID associated with the provided login details.
 
 ### Parameters
-- `login_data` *(cJSON\*)* -  login_data A cJSON object containing the login data (fields and their corresponding values).
+- `login_data` *(cJSON\*)* -  A cJSON object containing the login data (fields and their corresponding values).
 
 ### Returns
 - `char*` - Returns the Session ID if the login details match an entry in the database, or NULL if no matching Session ID is found or an error occurs.
@@ -205,11 +205,11 @@ Retrieves the Session ID associated with the provided login details.
 Updates the login data for a given Session ID. This function checks if the Session ID exists and if the provided login data is valid (all the login fields must be defined and have valid corresponding values) before updating it.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena The arena to store any temporary data required during processing.
+- `arena` *(Arena\*)* -  The arena to store any temporary data required during processing.
 
-- `session_id` *(char\*)* -  session_id The Session ID for which the login data needs to be updated.
+- `session_id` *(char\*)* -  The Session ID for which the login data needs to be updated.
 
-- `new_login_data` *(cJSON\*)* -  new_login_data The new login data in the form of a cJSON object (all login fields must be defined with valid values).
+- `new_login_data` *(cJSON\*)* -  The new login data in the form of a cJSON object (all login fields must be defined with valid values).
 
 ### Returns
 - `char*` - Returns the new Session ID if successful, otherwise NULL if there was an error.
@@ -222,11 +222,11 @@ Updates the login data for a given Session ID. This function checks if the Sessi
 Updates the user data for a given Session ID. This function checks if the Session ID exists and if the provided user data is valid before updating it.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena The arena to store any temporary data required during processing.
+- `arena` *(Arena\*)* -  The arena to store any temporary data required during processing.
 
-- `session_id` *(char\*)* -  session_id The Session ID for which the user data needs to be updated.
+- `session_id` *(char\*)* -  The Session ID for which the user data needs to be updated.
 
-- `new_user_data` *(cJSON\*)* -  new_user_data The new user data in the form of a cJSON object.
+- `new_user_data` *(cJSON\*)* -  The new user data in the form of a cJSON object.
 
 ### Returns
 - `char*` - Returns the new Session ID if successful, otherwise NULL if there was an error.
@@ -239,11 +239,11 @@ Updates the user data for a given Session ID. This function checks if the Sessio
 Updates both login and user data for a given Session ID. This function updates both sets of data (login and user) for the specified Session ID. All login fields must be defined and have valid values, user fields can be optionally filled out. If either update fails, the function will return NULL.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena The arena to store any temporary data required during processing.
+- `arena` *(Arena\*)* -  The arena to store any temporary data required during processing.
 
-- `session_id` *(char\*)* -  session_id The Session ID for which both login and user data needs to be updated.
+- `session_id` *(char\*)* -  The Session ID for which both login and user data needs to be updated.
 
-- `new_data` *(cJSON\*)* -  new_data A cJSON object containing both the new login and user data (all login fields must be defined with valid values).
+- `new_data` *(cJSON\*)* -  A cJSON object containing both the new login and user data (all login fields must be defined with valid values).
 
 ### Returns
 - `char*` - Returns the new Session ID if successful, otherwise NULL if there was an error.
@@ -256,7 +256,7 @@ Updates both login and user data for a given Session ID. This function updates b
 Expires a Session ID by updating its expiry date in the database. This function checks if the Session ID exists and is not already expired before attempting to expire it.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to expire.
+- `session_id` *(char\*)* -  The Session ID to expire.
 
 ### Returns
 - `bool` - Returns true if the Session ID was successfully expired, otherwise false if there was an error or if the Session ID was already expired.
@@ -269,9 +269,9 @@ Expires a Session ID by updating its expiry date in the database. This function 
 Retrieves the permissions associated with a given Session ID. This function queries the database to retrieve the list of permissions for the specified Session ID and returns them as a StringArray.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena The arena to store temporary data for string splitting.
+- `arena` *(Arena\*)* -  The arena to store temporary data for string splitting.
 
-- `session_id` *(char\*)* -  session_id The Session ID to retrieve permissions for.
+- `session_id` *(char\*)* -  The Session ID to retrieve permissions for.
 
 ### Returns
 - `StringArray` - Returns a StringArray containing the permissions associated with the Session ID. If no permissions are found or an error occurs, it returns a StringArray with the array member set to NULL and a count of 0.
@@ -284,7 +284,7 @@ Retrieves the permissions associated with a given Session ID. This function quer
 Retrieves the permissions associated with a given Session ID. This function queries the database to retrieve the permissions for the specified Session ID and returns them as a cJSON object.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to retrieve permissions for.
+- `session_id` *(char\*)* -  The Session ID to retrieve permissions for.
 
 ### Returns
 - `cJSON*` - Returns a cJSON object containing the permissions for the Session ID, or NULL if an error occurs or no permissions are found.
@@ -297,9 +297,9 @@ Retrieves the permissions associated with a given Session ID. This function quer
 Checks whether a specific permission is allowed for a given Session ID. This function checks the permissions associated with the Session ID and verifies if the specified permission is included.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to check permissions for.
+- `session_id` *(char\*)* -  The Session ID to check permissions for.
 
-- `permission` *(char\*)* -  permission The permission to check for.
+- `permission` *(char\*)* -  The permission to check for.
 
 ### Returns
 - `bool` - Returns true if the permission is allowed, otherwise false.
@@ -312,9 +312,9 @@ Checks whether a specific permission is allowed for a given Session ID. This fun
 Deletes a specific permission for the given Session ID. This function removes the specified permission from the Session ID's permission list in the database.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID from which to delete the permission.
+- `session_id` *(char\*)* -  The Session ID from which to delete the permission.
 
-- `permission` *(char\*)* -  permission The permission to delete.
+- `permission` *(char\*)* -  The permission to delete.
 
 ### Returns
 - `bool` - Returns true if the permission was found and successfully deleted, otherwise false.
@@ -327,9 +327,9 @@ Deletes a specific permission for the given Session ID. This function removes th
 Adds a specific permission for the given Session ID. This function adds the specified permission to the Session ID's permission list in the database.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to which the permission will be added.
+- `session_id` *(char\*)* -  The Session ID to which the permission will be added.
 
-- `permission` *(char\*)* -  permission The permission to add.
+- `permission` *(char\*)* -  The permission to add.
 
 ### Returns
 - `bool` - Returns true if the permission was successfully added, otherwise false.
@@ -342,9 +342,9 @@ Adds a specific permission for the given Session ID. This function adds the spec
 Sets the permissions for the given Session ID. This function updates the Session ID's permission list in the database with the new list of permissions provided.
 
 ### Parameters
-- `session_id` *(char\*)* -  session_id The Session ID to set the permissions for.
+- `session_id` *(char\*)* -  The Session ID to set the permissions for.
 
-- `permissions` *(StringArray)* -  permissions The new list of permissions as a StringArray.
+- `permissions` *(StringArray)* -  The new list of permissions as a StringArray.
 
 ### Returns
 - `bool` - Returns true if the permissions were successfully updated, otherwise false.
@@ -357,9 +357,9 @@ Sets the permissions for the given Session ID. This function updates the Session
 Retrieves all Session IDs from the authentication database. This function can optionally filter out expired sessions based on the `remove_expired` flag.
 
 ### Parameters
-- `remove_expired` *(bool)* -  remove_expired Flag to specify whether to exclude expired Session IDs from the results.
+- `remove_expired` *(bool)* -  Flag to specify whether to exclude expired Session IDs from the results.
 
-- `list_response` *(bool)* -  list_response Flag to indicate whether key-value pairs should be stored in a list.
+- `list_response` *(bool)* -  Flag to indicate whether key-value pairs should be stored in a list.
 
 ### Returns
 - `cJSON*` - Returns a cJSON object containing the Session IDs, or NULL if an error occurs.
@@ -372,9 +372,9 @@ Retrieves all Session IDs from the authentication database. This function can op
 This function looks for the "SessionID" in the provided cookies and, if found, checks if the token is expired in the authentication database. If the token is expired, a new Session ID is generated and returned.
 
 ### Parameters
-- `arena` *(Arena\*)* -  arena The arena to store any temporary data required during the process.
+- `arena` *(Arena\*)* -  The arena to store any temporary data required during the process.
 
-- `cookies` *(CookiesDict)* -  cookies The cookies which should include "SessionID".
+- `cookies` *(CookiesDict)* -  The cookies which should include "SessionID".
 
 ### Returns
 - `char*` - Returns the new Session ID if the existing one was valid and expired and a new one was generated, otherwise returns NULL.
@@ -387,7 +387,7 @@ This function looks for the "SessionID" in the provided cookies and, if found, c
 Deletes the user associated with the Session ID stored in the provided cookies. This function looks for the "SessionID" in the cookies and deletes the corresponding user from the authentication database.
 
 ### Parameters
-- `cookies` *(CookiesDict)* -  cookies The cookies which should include "SessionID".
+- `cookies` *(CookiesDict)* -  The cookies which should include "SessionID".
 
 ### Returns
 - `void` - None
@@ -400,7 +400,7 @@ Deletes the user associated with the Session ID stored in the provided cookies. 
 This function looks for the "SessionID" in the provided cookies and, if found, checks if the token is expired in the authentication database. If the token is expired, then it will refresh it's expiry date.
 
 ### Parameters
-- `cookies` *(CookiesDict)* -  cookies The cookies which should include "SessionID".
+- `cookies` *(CookiesDict)* -  The cookies which should include "SessionID".
 
 ### Returns
 - `bool` - Returns true if the expiry date was successfully refreshed, otherwise false.
@@ -413,7 +413,7 @@ This function looks for the "SessionID" in the provided cookies and, if found, c
 Adds a new user into the database if a user with the login details specified doesn't already exist.
 
 ### Parameters
-- `permissions` *(StringArray)* - A StringArray of permissions for the new user.
+- `permissions` *(StringArray)* -  A StringArray of permissions for the new user.
 
 - `rest_of_details` -  The arguments provided will first map onto the login fields and then the user fields there must be at least enough arguments to define all of the login fields, and the user fields can be optionally defined (see code examples to understand how this works).
 

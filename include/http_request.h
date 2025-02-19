@@ -369,6 +369,14 @@ HTTPEXPORTFUNC char* HTTP_CreateDateString(Arena* arena, String day_name, int da
 // TODO: Maybe we can move this to a better place.
 void   CreateHTTPResponseFunc(ThreadContext ctx, SSL* ssl);
 
+/* 
+   @desc Checks if the HTTP request method specified matches the one in the request and that the request contains JSON.
+   @param x The HTTP request method we want to check the request has.
+   @return Returns true if the request's method matches the one specified and the request contains JSON, false otherwise.
+*/
+#define HTTP_RequestMethodCompareAndIsJSON(x) (!strcmp(request_info->request_method, x) && request_info->is_json_request)
+
+
 #ifdef __cplusplus
 }
 #endif

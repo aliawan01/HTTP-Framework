@@ -156,9 +156,6 @@ char* DecodeURL(Arena* arena, char* url) {
 }
 
 char* RemoveWhitespaceFrontAndBack(Arena* arena, char* string, int front_offset, int back_offset) {
-	// TODO: Could possible be optimized? Instead calculate the parts with and without spaces 
-	// 	     and then use a single memmove across multiple bytes rather than a memmove on each
-	//		 iteration of the while loop.
     Temp scratch = GetScratch(&arena, 1);
 	char* string_copy = HTTP_StringDup(scratch.arena, string);
 
@@ -287,7 +284,6 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	while (match_id != -1) {
 		match_id = re_match(pattern, source_ptr, &match_length);
 		if (match_id != -1) {
-			// TODO: Can be optimized.
 			match_id_offset += match_id;
 			source_ptr += (match_id + match_length);
 
@@ -308,7 +304,6 @@ StringArray StrRegexGetMatches(Arena* arena, char* source, char* pattern) {
 	};
 }
 
-// TODO: This can be made MUCH more efficient...
 StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separator) {
     StringArray split_string = {
         .array = PushArray(arena, char*, 100),
@@ -374,10 +369,6 @@ StringArray StrSplitStringOnSeparator(Arena* arena, char* string, char* separato
     return split_string;
 }
 
-
-// TODO: Find a way to make a copy of the source string the scratch_arena, do work to replace
-//       duplicates there and then copy the string to the global_arena and then free the 
-//       scratch_arena.
 char* StrReplaceSubstringAllOccurance(Arena* arena, char* source, char* substring, char* replace) {
     Temp scratch = GetScratch(&arena, 1); 
     char* source_copy = HTTP_StringDup(scratch.arena, source);

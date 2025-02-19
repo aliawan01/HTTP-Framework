@@ -9,8 +9,15 @@ src/cJSON.c
 vendor/
 lexer/
 
+
 example/example_server/include/
 example/example_server/vendor/
 example/example_server/static/
 example/example_server/build/
 example/example_server/*.db
+
+example/example_rest_api/include/
+example/example_rest_api/vendor/
+example/example_rest_api/static/
+example/example_rest_api/build/
+example/example_rest_api/*.db

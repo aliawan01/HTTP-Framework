@@ -170,48 +170,9 @@ void HTTP_SetSearchDirectories(char* dirs[], size_t dirs_size) {
 	}
 }
 
-// TODO(ali): See if we are going to need this or just remove it.
-/* bool HTTP_HandleRedirectRoute(char* method, char* origin_route, char* redirect_route) { */
-/* 	// Checking if the route is in the correct format. */
-/* 	if (origin_route[0] != '/') { */
-/* 		printf("[ERROR] HTTP_HandleRedirectRoute() origin route given: `%s` is not in the correct format.\n", origin_route); */
-/* 		return false; */
-/* 	} */
-
-/* 	bool redirect_route_exists = false; */
-/* 	int redirect_route_index; */
-
-/* 	for (int index = 0; index < route_info_array_index+1; index++) { */
-/* 		if (!strcmp(route_info_array[index].route, origin_route)) { */
-/* 			printf("[ERROR] HTTP_HandleRedirectRoute() origin route given already exists: `%s`\n", origin_route); */
-/* 			return false; */
-/* 		} */
-/* 		else if (!strcmp(route_info_array[index].route, redirect_route)) { */
-/* 			redirect_route_exists = true; */
-/* 			redirect_route_index = index; */
-/* 		} */
-/* 	} */
-
-/* 	if (!redirect_route_exists) { */
-/* 		printf("[ERROR] HTTP_HandleRedirectRoute() redirection route given does not exist: %s\n", redirect_route); */
-/* 		return false; */
-/* 	} */
-
-/* 	route_info_array_index++; */
-	
-/* 	route_info_array[route_info_array_index] = (HTTPRouteAndFilePath) { */
-/* 		.route = origin_route, */
-/* 		.path_to_file = route_info_array[redirect_route_index].path_to_file */
-/* 	}; */
-
-/* 	printf("Added Redirect Route: origin route: %s, redirect route: %s\n", origin_route, redirect_route); */
-/* 	return true; */
-/* } */
-
 static bool HTTP_ExtractFileTypeFromFilePath(char* path_to_file, char* file_type) {
 	int index = 0;
 	
-	// TODO: Can probably optimise this.
 	while (true) {
 		if (path_to_file[index] == '.') {
 			break;
@@ -431,31 +392,6 @@ static void HTTP_ConvertFileExtensionToContentType(char* content_type, char* fil
 	}
 }
 
-// TODO: It isn't being used anywhere, what's it for? do we even need it?
-static char* HTTP_CreateResponseHeaderFromFile(Arena* arena, char* path_to_file, bool created_new_entry) {
-	// Extracting file type into a separate string.
-	char file_type[24] = {0};
-	HTTP_ExtractFileTypeFromFilePath(path_to_file, file_type);
-
-	// Generating Header based on file type.
-	char content_type[100] = {0};
-    HTTP_ConvertFileExtensionToContentType(content_type, file_type);
-
-    enum HTTPStatusCode status_code;
-    if (created_new_entry) {
-        status_code = CREATED_201;
-    }
-    else {
-        status_code = OK_200;
-    }
-
-	char* http_response_header = PushString(arena, 1024);
-	sprintf(http_response_header, "HTTP/1.1 %s\r\nContent-Type: %s\r\n\r\n", HTTP_StatusCodeStrings[status_code], content_type);
-
-	return http_response_header;
-}
-
-// TODO: Think of a better way of sending 404 pages.
 bool HTTP_Set404Page(char* path_to_error_page) {
     bool successfully_set_404_page = false;
 
@@ -474,7 +410,6 @@ bool HTTP_Set404Page(char* path_to_error_page) {
     return successfully_set_404_page;
 }
 
-// TODO: Allow the user to send a custom 404 page.
 static int Send404Page(SSL* ssl, char* route) {
     ThreadReadWriteLock_AcquireSharedLock(&ctx.error_page_shared_mutex);
     String file_contents = {0};
@@ -672,9 +607,24 @@ String HTTP_TemplateTextFromFile(Arena* arena, HTTPRequestInfo* request_info, cJ
 }
 
 void HTTP_AddHeaderToHeaderDict(Arena* arena, HeaderDict* header_dict, char* key, char* value) {
-    header_dict->keys[header_dict->count] = HTTP_StringDup(arena, key);
-    header_dict->values[header_dict->count] = HTTP_StringDup(arena, value);
-    header_dict->count++;
+    if (key == NULL || value == NULL) {
+        return;
+    }
+
+    bool found_existing_key = false;
+    for (int i = 0; i < header_dict->count; i++) {
+        if (!strcmp(header_dict->keys[i], key)) {
+            header_dict->values[i] = HTTP_StringDup(arena, value);
+            found_existing_key = true;
+            break;
+        }
+    }
+
+    if (!found_existing_key) {
+        header_dict->keys[header_dict->count] = HTTP_StringDup(arena, key);
+        header_dict->values[header_dict->count] = HTTP_StringDup(arena, value);
+        header_dict->count++;
+    }
 }
 
 void HTTP_AddCookieToCookieJar(Arena* arena,

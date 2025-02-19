@@ -40,6 +40,7 @@ static bool IsPowerOfTwo(uint64_t num) {
 #define KB(bytes) (uint64_t)bytes*1024
 
 #include "base_thread.h"
+#include "thread_pool.h"
 
 #define ArrayCount(array) sizeof(array)/sizeof(array[0])
 #define Maximum(a, b) (a > b) ? a : b

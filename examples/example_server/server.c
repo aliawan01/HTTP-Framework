@@ -4,7 +4,6 @@
 #include "http_string_handling.h"
 #include "http_database.h"
 #include "http_authentication.h"
-#include "thread_pool.h"
 
 void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
     printf("second_page_handler: `%s`\n", request_info->user_permission); 
@@ -21,7 +20,7 @@ void second_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPRespon
 }
 
 void root_page_handler(Arena* arena, HTTPRequestInfo* request_info, HTTPResponse* response) {
-    if (!strcmp(request_info->request_method, "POST") && request_info->is_json_request) {
+    if (HTTP_RequestMethodCompareAndIsJSON("POST")) {
         HTTP_RunSQLQuery("DELETE FROM Info", false, true);
         cJSON* converted_array = HTTP_cJSON_TurnObjectIntoArray("Info", request_info->json_request_body);
         HTTP_InsertJSONIntoDatabase(converted_array);

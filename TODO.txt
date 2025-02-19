@@ -5,32 +5,16 @@
 
   * Turn the work queue into a ring buffer.
 
-  *** Finish off the lexer to generate documentation for the project.
-    => Remember to write down docs for certain macros like `HTTP_Auth_AddUserIfNotExists`
-       manually since the lexer didn't find those.
-    => Fix bug where in headings like http_string_handling.h 
-       string gets turned slanted because _word_ is the same as *word*
-       could do the same thing we did with the asterix to make it work
-       (add escape character before it: `\_`).
-
-
-  * Make an example REST API.
+  *** Make an example REST API.
   * Make an example to show how authentication works.
-  * Make server logs easier to read and add colour
+  * Fix duplicate error messages being printed in HTTP_AddCookieToCookieJar.
 
-  *** Turn back the HTTPEXPORTFUNC definition in http_platform.h
-      after we made the lexer work!
   * Make script to build all of the examples.
+  * Tell the user how to use mkcert to generate certificates in the tutorial.
 
-  * Test AtomicCompareExchange to make sure it works right because we 
-    probably messed it up. => Seems like it is working properly now.
-    => Check to make sure it works on Windows as well.
-
-  *** Tell the user how to use mkcert to generate certificates in the tutorial.
-
-  *** Perhaps find a way to have each request be handled by a thread, instead
-      of each client being handled by a seperate thread, could be done through
-      non-blocking sockets `BIO_set_nbio()`.
+  * Perhaps find a way to have each request be handled by a thread, instead
+    of each client being handled by a seperate thread, could be done through
+    non-blocking sockets `BIO_set_nbio()`.
 
   ** Find a way to add multiple seperate loopback devices to test the multithreading.
 
@@ -39,7 +23,7 @@
   * Rethink how we include files/do stuff with initializing allocators,
     threads and arenas.
 
-
+  * Test to find out why `escape_character = '‘';` wasn't compiling on Linux.
 
   *** Authentication
       - Add support for running ALTER on the session authentication table to add or 
@@ -64,6 +48,8 @@
 
   * Add more status codes to HTTPStatusCode and fill out the matching status
     code strings in HTTP_StatusCodeStrings.
+
+
 
 
   - Only let the user run the HTTP_TemplateText() and HTTP_TemplateTextFromFile()

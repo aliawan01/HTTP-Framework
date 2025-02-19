@@ -1,7 +1,5 @@
 #include "http_platform.h"
 
-/* #if SOMETHING */
-// TODO(ali): Remove this after making it work on linux.
 #ifdef _WIN32
 
 enum HTTPCreateDirStatus HTTP_CreateDir(char* file_path) {

@@ -36,7 +36,7 @@ void HTTP_Log(enum HTTPLogType type, char* formatString, ...) {
 
     Temp scratch = GetScratch(0, 0);
 
-    char* formatStringWithColor = PushString(scratch.arena, strlen(formatString)+20);
+    char* formatStringWithColor = PushString(scratch.arena, strlen(formatString)+30);
 
     if (type == HTTP_ERROR) {
         strcat(formatStringWithColor, "\033[0;31m");
@@ -45,6 +45,8 @@ void HTTP_Log(enum HTTPLogType type, char* formatString, ...) {
 
         vfprintf(stderr, formatStringWithColor, args);
         DeleteScratch(scratch);
+        va_end(args);
+        return;
     }
     else if (type == HTTP_WARNING) {
         strcat(formatStringWithColor, "\033[0;33m");
@@ -53,7 +55,6 @@ void HTTP_Log(enum HTTPLogType type, char* formatString, ...) {
         strcat(formatStringWithColor, "\033[0;32m");
     }
 
-    strcat(formatStringWithColor, formatString);
     strcat(formatStringWithColor, "\033[0m");
     vfprintf(stdout, formatStringWithColor, args);
     DeleteScratch(scratch);
