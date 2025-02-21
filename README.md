@@ -18,7 +18,6 @@ It provides the following features and much more!
 - Can send and receive images
 - Provides an API for creating, deleting and modifying files.
 
----
 ## Building
 
 ### Dependencies
