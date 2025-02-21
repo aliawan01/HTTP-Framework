@@ -16,6 +16,7 @@ It provides the following features and much more!
 - Supports regex based routes.
 - Can send and receive images
 - Provides an API for creating, deleting and modifying files.
+- Provides helper functions for cJSON.
 
 ## Building
 
