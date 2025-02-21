@@ -41,7 +41,7 @@ In the project's root directory run `misc/setup_linux.sh`
 
 
 #### Compile examples
-Run `misc/build_example.sh.`
+Run `misc/build_example.sh`
 
 ## Examples
 
