@@ -1,8 +1,6 @@
 # HTTP Framework
 
 
-
----
 ## Overview
 
 This is a HTTP Framework written in C11 which supports both Windows and Linux.
@@ -45,7 +43,6 @@ In the project's root directory run `misc/setup_linux.sh`
 #### Compile examples
 Run `misc/build_example.sh.`
 
----
 ## Examples
 
 In the examples directory there are two examples which show how the 
@@ -54,7 +51,6 @@ framework can be used, they are:
 - A basic https server.
 - A REST API.
 
----
 ## Docs
 
 Documentation for all of the project's exported functions can be found
